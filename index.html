@@ -124,8 +124,13 @@ const edgeMat = new THREE.LineBasicMaterial({color:0x3b3631, transparent:true, o
 
 // Alles wird in die gerade aktive Gruppe gebaut (CUR), damit ganze Seiten ausblendbar sind
 let CUR = scene;
+// Gegen Flackern: jede Box wird um einen anderen Bruchteil eines Millimeters kleiner gebaut,
+// damit nie zwei Flächen exakt aufeinanderliegen
+let boxN = 0;
 function box(w, h, d, m, x, y, z, parent=CUR, edges=true){
-  const g = new THREE.BoxGeometry(w, h, d);
+  const ins = 0.0001 + ((boxN++ * 0.6180339) % 1) * 0.0012;
+  const sh = v => Math.max(v - 2*Math.min(ins, v*0.1), v*0.5);
+  const g = new THREE.BoxGeometry(sh(w), sh(h), sh(d));
   const mesh = new THREE.Mesh(g, m);
   mesh.position.set(x, y, z);
   mesh.castShadow = mesh.receiveShadow = true;
@@ -150,12 +155,14 @@ function sphere(r, m, x, y, z, parent=CUR){
   parent.add(mesh);
   return mesh;
 }
-// Front mit eingefräster Griffmulde oben: von der Oberkante 1 cm senkrecht nach unten,
-// dann im 40°-Winkel zurück zur Vorderseite. Profil im Schnitt (x = Tiefe, hinten 0, vorn T), extrudiert über die Breite.
+// Front mit eingefräster Griffmulde oben (offene Tasche zum Reingreifen). Profil im Schnitt (x = Tiefe, hinten 0, vorn T), extrudiert über die Breite.
 function gripFront(len, h, m, parent=CUR){
-  const t = 0.02, dIn = 0.012, drop = 0.010, bev = dIn*Math.tan(40*Math.PI/180);
+  // Tasche oben offen: vorn eine 4 mm Lippe, dahinter 12 mm breite Mulde,
+  // vorn 1 cm tief, Boden fällt im 40°-Winkel nach hinten ab
+  const t = 0.02, lip = 0.004, wPk = 0.012, drop = 0.010, bev = wPk*Math.tan(40*Math.PI/180);
   const s = new THREE.Shape();
-  s.moveTo(0,0); s.lineTo(t,0); s.lineTo(t,h-drop-bev); s.lineTo(t-dIn,h-drop); s.lineTo(t-dIn,h); s.lineTo(0,h); s.lineTo(0,0);
+  s.moveTo(0,0); s.lineTo(t,0); s.lineTo(t,h); s.lineTo(t-lip,h);
+  s.lineTo(t-lip,h-drop); s.lineTo(t-lip-wPk,h-drop-bev); s.lineTo(t-lip-wPk,h); s.lineTo(0,h); s.lineTo(0,0);
   const g = new THREE.ExtrudeGeometry(s, {depth:len, bevelEnabled:false});
   const mesh = new THREE.Mesh(g, m);
   mesh.castShadow = mesh.receiveShadow = true;
@@ -317,10 +324,12 @@ box(0.006, 0.16, 0.012, M.grip, 0.001, (Y1-HY)/2, -spW+0.03, spiceDoor, false); 
 const hood = group();
 bx(0.33,0.35, Y0+0.005,HY-0.005, SP.z0+0.005,SP.z1-0.005, M.front, hood);
 bx(0.06,0.35, Y0-0.006,Y0-0.001, SP.z0+0.01,SP.z1-0.01, M.steel, hood);
-const hoodLampMat = new THREE.MeshBasicMaterial({color:0xfff6d8});
+const hoodLampMat = new THREE.MeshBasicMaterial({color:0x8a8a8a});
 for (const z of [HZ-0.15, HZ+0.15]){
-  const l = new THREE.Mesh(new THREE.CircleGeometry(0.018, 20), hoodLampMat);
-  l.rotation.x = Math.PI/2; l.position.set(0.22, Y0-0.001, z); CUR.add(l);
+  const l = new THREE.Mesh(new THREE.CircleGeometry(0.022, 24), hoodLampMat);
+  l.rotation.x = Math.PI/2; l.position.set(0.24, Y0-0.0075, z); hood.add(l);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.022, 0.027, 24), M.steel);
+  ring.rotation.x = Math.PI/2; ring.position.set(0.24, Y0-0.0074, z); hood.add(ring);
 }
 const hobLight = new THREE.SpotLight(0xfff1d6, 3, 2, Math.PI/3, .6);
 hobLight.position.set(0.25, Y0-0.02, HZ); hobLight.target.position.set(0.3, AP, HZ);
@@ -497,7 +506,7 @@ CUR = scene;
 wallMeshes.forEach(m => { m.castShadow = false; });
 
 // ---------- Steuerung ----------
-const state = {flaps:0, corner:0, spice:0, hood:0, d0:0, d1:0, d2:0, dw:0, sink:0, pull:0, tray:0, led:1, buffet:0, hl:1};
+const state = {flaps:0, corner:0, spice:0, hood:0, d0:0, d1:0, d2:0, dw:0, sink:0, pull:0, tray:0, led:0, buffet:0, hl:0};
 const target = {...state};
 const deg = Math.PI/180;
 const clamp01 = v => Math.max(0, Math.min(1, v));
@@ -595,6 +604,7 @@ renderer.setAnimationLoop(now => {
   updateWalls();
   renderer.render(scene, camera);
   window.__ready = true;
+  window.__scene = scene;
 });
 </script>
 </body>
