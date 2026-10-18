@@ -37,6 +37,7 @@
     <button data-t="corner">Eckschrank</button>
     <button data-t="spice">Gewürzschrank</button>
     <button data-t="hood">Haube ausziehen</button>
+    <button data-t="led">Licht</button>
   </div>
   <h2>Unten öffnen</h2>
   <div class="row">
@@ -46,6 +47,7 @@
     <button data-t="dw">Spülmaschine</button>
     <button data-t="sink">Spülenschrank</button>
     <button data-t="pull">Auszug am Ofen</button>
+    <button data-t="tray">Blechschublade</button>
   </div>
   <h2>Ansicht</h2>
   <div class="row">
@@ -236,15 +238,21 @@ for (const z of [0.12, 0.20]){                                        // zwei St
   box(0.004,0.04,0.04, mat(0xd8d8d8), 0.014, 1.06, z, CUR, false);
 }
 
-// Unterschrank Herdseite: Ecke, Backofen 60, daneben schmaler Auszug (früher Weinregal)
-const OV = {z0:0.63, z1:1.23}, PU = {z0:1.23, z1:1.40};
-bx(0,0.56, 0,PL, 0,1.40, M.plinth);
+// Unterschrank Herdseite: Ecke 60 × 60, Backofen 60 mit Blechschublade, daneben 15 cm Auszug (früher Weinregal)
+const OV = {z0:0.60, z1:1.20}, PU = {z0:1.20, z1:1.35};
+bx(0,0.56, 0,PL, 0,PU.z1, M.plinth);
 bx(0,0.58, PL,BT, 0,PU.z0, M.body);
 bx(0,0.02, PL,BT, PU.z0,PU.z1, M.inner, CUR, false);
-bx(0.555,0.58, 0.84,BT, 0.60,1.40, M.grip, CUR, false);
+bx(0.555,0.58, 0.84,BT, 0.60,PU.z1, M.grip, CUR, false);
 const frontX = (z0,z1,y0,y1) => bx(0.58,0.60, y0+gap,y1-gap, z0+gap,z1-gap, M.front);
-frontX(0.60,OV.z0, 0.10,0.84);
-frontX(OV.z0,OV.z1, 0.10,0.24);
+// Blechschublade unter dem Ofen
+const tray = group();
+bx(0.58,0.60, 0.10+gap,0.24-gap, OV.z0+gap,OV.z1-gap, M.front, tray);
+bx(0.10,0.58, 0.12,0.132, OV.z0+0.03,OV.z1-0.03, M.inner, tray);
+bx(0.10,0.58, 0.12,0.21, OV.z0+0.03,OV.z0+0.042, M.inner, tray);
+bx(0.10,0.58, 0.12,0.21, OV.z1-0.042,OV.z1-0.03, M.inner, tray);
+bx(0.10,0.112, 0.12,0.21, OV.z0+0.03,OV.z1-0.03, M.inner, tray);
+for (let i=0;i<2;i++) bx(0.14,0.55, 0.135+i*0.02,0.14+i*0.02, OV.z0+0.06,OV.z1-0.06, M.black, tray);   // Bleche
 bx(0.58,0.602, 0.25,0.84, OV.z0+0.005,OV.z1-0.005, M.black);
 bx(0.602,0.606, 0.31,0.71, OV.z0+0.04,OV.z1-0.04, M.glass, CUR, false);
 bx(0.602,0.606, 0.74,0.83, OV.z0+0.04,OV.z1-0.04, M.steel, CUR, false);
@@ -259,7 +267,7 @@ const pull = group();
   bx(0.06,0.08, 0.12,0.80, w0,w1, M.inner, pull);                  // hintere Stütze, Seiten offen
 }
 // Arbeitsplatte + Kochfeld
-bx(0,0.62, BT,AP, 0,1.40, M.top);
+bx(0,0.60, BT,AP, 0,PU.z1, M.top);
 const HZ = (OV.z0+OV.z1)/2;
 bx(0.05,0.57, AP,AP+0.004, HZ-0.29,HZ+0.29, M.glass);
 for (const [x,dz,r] of [[0.18,-0.15,.08],[0.43,-0.15,.06],[0.18,0.15,.06],[0.43,0.15,.09]]){
@@ -267,7 +275,7 @@ for (const [x,dz,r] of [[0.18,-0.15,.08],[0.43,-0.15,.06],[0.18,0.15,.06],[0.43,
   ring.rotation.x = -Math.PI/2; ring.position.set(x, AP+0.005, HZ+dz); CUR.add(ring);
 }
 // Kühlschrank: normaler Standkühlschrank, 60 breit, 58 tief, niedriger als die Tür
-const FR = {z0:1.41, z1:2.01, d:0.58, h:1.80};
+const FR = {z0:1.36, z1:1.96, d:0.58, h:1.80};   // 60 cm breit
 bx(0,FR.d, 0,FR.h, FR.z0,FR.z1, M.steel);
 bx(FR.d,FR.d+0.002, 1.12,1.13, FR.z0+0.01,FR.z1-0.01, M.grip, CUR, false);
 cyl(.011,.38, M.steel, FR.d+0.03,1.38,FR.z0+0.05);
@@ -278,7 +286,7 @@ box(0.012,0.08,0.08, M.white, 0.006, FR.h+0.15, (FR.z0+FR.z1)/2);
 box(0.004,0.04,0.04, mat(0xd8d8d8), 0.014, FR.h+0.15, (FR.z0+FR.z1)/2, CUR, false);
 
 // Gewürzschrank über dem Kochfeld, Haube unten eingebaut und hinter einer Trennwand versteckt
-const SP = {z0:0.75, z1:1.40}, HY = Y0+0.12;
+const SP = {z0:0.60, z1:1.35}, HY = Y0+0.12;
 bx(0,0.33, Y1-T,Y1, SP.z0,SP.z1, M.body);
 bx(0,0.33, HY,HY+T, SP.z0,SP.z1, M.body);
 bx(0,0.33, HY,Y1, SP.z0,SP.z0+T, M.body);
@@ -314,7 +322,7 @@ for (const x of [1.05,1.65]) bx(x-0.009,x+0.009, PL,BT, 0.02,0.58, M.inner);
 bx(0.60,CH.x0, 0.84,BT, 0.555,0.58, M.grip, CUR, false);
 bx(0.60,1.05, 0.40,0.42, 0.555,0.58, M.grip, CUR, false);
 bx(0.60,1.05, 0.70,0.72, 0.555,0.58, M.grip, CUR, false);
-bx(0.62,CH.x0, BT,AP, 0,0.62, M.top);
+bx(0.60,CH.x0, BT,AP, 0,0.60, M.top);   // 167 × 60 bis zum Kamin
 
 // Drei Schubladen, einzeln: oben flach für Besteck, darunter zwei große (leer)
 const drawers = [];
@@ -386,6 +394,8 @@ function carcass(x0, x1){
   bx(x0+T,x1-T, Y1-T-0.002,Y1-T, 0.01,D-T, M.inner, CUR, false);
 }
 const flapRigs = [];
+const ledMat = new THREE.MeshStandardMaterial({color:0xfff6e0, emissive:0xfff0d0, emissiveIntensity:1});
+const ledLights = [];
 for (const [x0,x1] of [[0.75,1.51],[1.51,CH.x0]]){
   carcass(x0, x1);
   const w = x1-x0-2*gap, hh = (Y1-Y0)/2 - gap;
@@ -395,22 +405,28 @@ for (const [x0,x1] of [[0.75,1.51],[1.51,CH.x0]]){
   box(w, hh, T, M.front, 0, -hh/2, -T/2, lower);
   box(0.16, 0.012, 0.006, M.grip, 0, -hh+0.012, 0.001, lower, false);
   flapRigs.push({upper, lower});
+  // LED-Streifen unter dem Schrank
+  const strip = bx(x0+0.04,x1-0.04, Y0-0.006,Y0, D-0.07,D-0.05, ledMat, CUR, false);
+  strip.castShadow = false;
+  const sl = new THREE.SpotLight(0xfff0d6, 2.2, 1.6, Math.PI/2.4, .8);
+  sl.position.set((x0+x1)/2, Y0-0.01, D-0.08); sl.target.position.set((x0+x1)/2, AP, D-0.15);
+  CUR.add(sl, sl.target); ledLights.push(sl);
 }
 
 // ---------- Eckschrank über Eck: zwei Türen gehen von der Mitte nach außen auf ----------
 CUR = G.corner;
 bx(0,0.75, Y0,Y1, 0,0.33, M.body);
-bx(0,0.33, Y0,Y1, 0.33,0.75, M.body);
+bx(0,0.33, Y0,Y1, 0.33,0.60, M.body);
 bx(0.35,0.73, Y0+T,Y1-T, 0.33,0.332, M.inner, CUR, false);
-bx(0.33,0.332, Y0+T,Y1-T, 0.35,0.73, M.inner, CUR, false);
+bx(0.33,0.332, Y0+T,Y1-T, 0.35,0.58, M.inner, CUR, false);
 bx(0.35,0.73, YM-0.01,YM+0.01, 0.20,0.333, M.inner);
-bx(0.20,0.333, YM-0.01,YM+0.01, 0.35,0.73, M.inner);
+bx(0.20,0.333, YM-0.01,YM+0.01, 0.35,0.58, M.inner);
 const cornerFront = group(); cornerFront.position.set(0.75, Y0, 0.35);
 box(0.40-gap, Y1-Y0-gap, T, M.front, -0.20, (Y1-Y0)/2, -T/2, cornerFront);
 sphere(.014, M.steel, -0.37, (Y1-Y0)*0.18, 0.012, cornerFront);
-const cornerSide = group(); cornerSide.position.set(0.35, Y0, 0.75);
-box(T, Y1-Y0-gap, 0.40-gap, M.front, -T/2, (Y1-Y0)/2, -0.20, cornerSide);
-sphere(.014, M.steel, 0.012, (Y1-Y0)*0.18, -0.37, cornerSide);
+const cornerSide = group(); cornerSide.position.set(0.35, Y0, 0.60);
+box(T, Y1-Y0-gap, 0.25-gap, M.front, -T/2, (Y1-Y0)/2, -0.125, cornerSide);
+sphere(.014, M.steel, 0.012, (Y1-Y0)*0.18, -0.225, cornerSide);
 
 // ---------- Kaminwand: Holzschrank, max. 36 cm tief, bündig mit dem Kamin ----------
 CUR = G.chimney;
@@ -450,7 +466,7 @@ CUR = scene;
 wallMeshes.forEach(m => { m.castShadow = false; });
 
 // ---------- Steuerung ----------
-const state = {flaps:0, corner:0, spice:0, hood:0, d0:0, d1:0, d2:0, dw:0, sink:0, pull:0};
+const state = {flaps:0, corner:0, spice:0, hood:0, d0:0, d1:0, d2:0, dw:0, sink:0, pull:0, tray:0, led:1};
 const target = {...state};
 const deg = Math.PI/180;
 const clamp01 = v => Math.max(0, Math.min(1, v));
@@ -468,6 +484,9 @@ function apply(){
   dwDoor.rotation.x = state.dw*88*deg;
   sinkDoor.rotation.y = -state.sink*90*deg;
   pull.position.x = state.pull*0.45;
+  tray.position.x = state.tray*0.40;
+  ledLights.forEach(l => l.intensity = state.led*2.2);
+  ledMat.emissiveIntensity = state.led;
 }
 const views = {
   a: {pos:[2.3,3.4,4.1], tgt:[0.9,0.9,0.7]},
