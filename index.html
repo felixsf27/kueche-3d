@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Küche 3D</title>
+<style>
+  :root{--bg:#f4efe7;--panel:#fffaf3;--ink:#2f2a25;--muted:#7a6f63;--accent:#b8643f;--line:#e2d8ca;--btn:#efe6d9}
+  @media (prefers-color-scheme:dark){:root{--bg:#1d1a17;--panel:#272320;--ink:#efe7dc;--muted:#a89c8e;--accent:#d9825c;--line:#3a342e;--btn:#332e29}}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden}
+  #c{position:fixed;inset:0;width:100%;height:100%;display:block}
+  .ui{position:fixed;left:16px;top:16px;width:290px;max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 14px 12px;box-shadow:0 8px 28px rgba(0,0,0,.12);box-sizing:border-box}
+  .ui h1{font-size:17px;margin:0 0 2px}
+  .ui p{margin:0 0 10px;color:var(--muted);font-size:13px}
+  .ui h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:12px 0 6px}
+  .row{display:flex;flex-wrap:wrap;gap:6px}
+  button{font:inherit;font-size:14px;border:1px solid var(--line);background:var(--btn);color:var(--ink);border-radius:9px;padding:7px 10px;cursor:pointer}
+  button:hover{border-color:var(--accent)}
+  button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .save{width:100%;margin-top:12px;background:var(--accent);border-color:var(--accent);color:#fff}
+  .toggle{position:fixed;left:16px;top:16px;display:none}
+  .hidden .ui{display:none}.hidden .toggle{display:block}
+  @media (max-width:600px){.ui{top:auto;bottom:16px;width:auto;right:16px;max-height:45vh}}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="ui">
+  <h1>Unsere Küche</h1>
+  <p>Drehen mit Maus oder Finger, Mausrad zoomt. Die Seite, hinter der du stehst, blendet sich mit allen Schränken aus. Raum 2,63 × 3,15 m, Arbeitsplatte 92 cm.</p>
+  <h2>Oben öffnen</h2>
+  <div class="row">
+    <button data-t="flaps">Klappen</button>
+    <button data-t="corner">Eckschrank</button>
+    <button data-t="spice">Gewürzschrank</button>
+    <button data-t="hood">Haube ausziehen</button>
+  </div>
+  <h2>Unten öffnen</h2>
+  <div class="row">
+    <button data-t="d0">Besteck</button>
+    <button data-t="d1">Schublade Mitte</button>
+    <button data-t="d2">Schublade unten</button>
+    <button data-t="dw">Spülmaschine</button>
+    <button data-t="sink">Spülenschrank</button>
+    <button data-t="pull">Auszug am Ofen</button>
+  </div>
+  <h2>Ansicht</h2>
+  <div class="row">
+    <button data-v="a">Von oben</button>
+    <button data-v="b">Spülseite</button>
+    <button data-v="c">Herdseite</button>
+    <button data-v="e">Holzschrankseite</button>
+    <button data-v="d">Fensterseite</button>
+  </div>
+  <button class="save" id="save">Bild speichern</button>
+  <div class="row" style="margin-top:8px"><button id="hide">Menü ausblenden</button></div>
+</div>
+<button class="toggle" id="show">Menü</button>
+
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf1efeb);
+const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 50);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI * 0.49;
+controls.minDistance = 0.5;
+controls.maxDistance = 9;
+
+// Licht
+scene.add(new THREE.HemisphereLight(0xffffff, 0xd9d0c5, 1.0));
+const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+sun.position.set(2.2, 6, 3.2);
+sun.target.position.set(1.3, 0, 1.4);
+scene.add(sun.target);
+sun.castShadow = true;
+sun.shadow.mapSize.set(4096, 4096);
+Object.assign(sun.shadow.camera, {left:-2.5, right:2.5, top:2.5, bottom:-2.5, near:2, far:10});
+sun.shadow.bias = -0.0002;
+sun.shadow.normalBias = 0.02;
+scene.add(sun);
+const fill = new THREE.PointLight(0xffffff, 2.5, 7);
+fill.position.set(1.3, 2.5, 1.7);
+scene.add(fill);
+
+// Materialien
+const mat = (color, o={}) => new THREE.MeshStandardMaterial({color, roughness:.6, ...o});
+const M = {
+  front: mat(0xc4baad, {roughness:.5}),
+  body: mat(0xb8aea1),
+  inner: mat(0xf4f2ee),
+  top: mat(0x4a4643, {roughness:.55}),
+  wall: mat(0xfbfbfa, {roughness:.95}),
+  plinth: mat(0x8f877d),
+  steel: mat(0xc6c8ca, {metalness:.65, roughness:.32}),
+  black: mat(0x1d1d1d, {roughness:.35}),
+  glass: mat(0x101010, {roughness:.08, metalness:.3}),
+  grip: mat(0x5e574f),
+  pine: mat(0xc98c4f, {roughness:.55}),
+  pineDark: mat(0x9c6532, {roughness:.6}),
+  door: mat(0x6b4a33, {roughness:.7}),
+  white: mat(0xffffff, {roughness:.5}),
+  pane: mat(0xbfd9e6, {roughness:.05, transparent:true, opacity:.35}),
+  sill: mat(0xe6dccb, {roughness:.5}),
+  pipe: mat(0x9a9a9a, {metalness:.5, roughness:.35}),
+};
+const edgeMat = new THREE.LineBasicMaterial({color:0x3b3631, transparent:true, opacity:.45});
+
+// Alles wird in die gerade aktive Gruppe gebaut (CUR), damit ganze Seiten ausblendbar sind
+let CUR = scene;
+function box(w, h, d, m, x, y, z, parent=CUR, edges=true){
+  const g = new THREE.BoxGeometry(w, h, d);
+  const mesh = new THREE.Mesh(g, m);
+  mesh.position.set(x, y, z);
+  mesh.castShadow = mesh.receiveShadow = true;
+  if (edges) mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(g), edgeMat));
+  parent.add(mesh);
+  return mesh;
+}
+const bx = (x0,x1,y0,y1,z0,z1,m,parent=CUR,edges=true) =>
+  box(x1-x0, y1-y0, z1-z0, m, (x0+x1)/2, (y0+y1)/2, (z0+z1)/2, parent, edges);
+function cyl(r, h, m, x, y, z, parent=CUR, rot){
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 24), m);
+  mesh.position.set(x, y, z);
+  if (rot) mesh.rotation.set(...rot);
+  mesh.castShadow = true;
+  parent.add(mesh);
+  return mesh;
+}
+function sphere(r, m, x, y, z, parent=CUR){
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 14), m);
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  parent.add(mesh);
+  return mesh;
+}
+const group = (parent=CUR) => { const g = new THREE.Group(); parent.add(g); return g; };
+
+// ---------- Raum ----------
+// x entlang der Spülwand (Herd-/Türwand bei x=0, Kaminwand bei x=W)
+// z von der Spülwand Richtung Fenster, y hoch. Maße in Metern nach Felix' Skizze.
+const W = 2.63, L = 3.15, H = 2.75;
+const CH = {x0:2.27, z1:0.62};   // ehemaliger Kamin: 36 cm breit, 62 cm tief
+const gap = 0.003, T = 0.02;
+const PL = 0.10, BT = 0.88, AP = 0.92;           // Sockel, Korpus oben, Arbeitsplatte oben
+const Y0 = 1.50, Y1 = 2.22, D = 0.35, YM = (Y0+Y1)/2;   // Oberschränke 72 cm
+
+function tileTexture(){
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d');
+  const grd = g.createLinearGradient(0,0,256,256);
+  grd.addColorStop(0,'#f2cf9a'); grd.addColorStop(.5,'#ecc185'); grd.addColorStop(1,'#f4d6a6');
+  g.fillStyle = grd; g.fillRect(0,0,256,256);
+  for (let i=0;i<40;i++){ g.fillStyle = `rgba(214,150,70,${Math.random()*.18})`; g.beginPath(); g.ellipse(Math.random()*256,Math.random()*256,10+Math.random()*40,4+Math.random()*10,Math.random()*3,0,7); g.fill(); }
+  g.strokeStyle = '#4a3b2c'; g.lineWidth = 3; g.strokeRect(0,0,256,256);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.center.set(.5,.5); t.rotation = Math.PI/4;
+  t.repeat.set(W/0.33, L/0.33);
+  t.anisotropy = 8;
+  return t;
+}
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, L), new THREE.MeshStandardMaterial({map:tileTexture(), roughness:.45}));
+floor.rotation.x = -Math.PI/2; floor.position.set(W/2, 0, L/2); floor.receiveShadow = true;
+scene.add(floor);
+
+// Seiten-Gruppen: jede Seite verschwindet samt Schränken, wenn die Kamera dahinter steht
+const G = {
+  back: group(scene),      // Spülwand mit allem daran
+  stove: group(scene),     // Herd-/Türwand mit Herd, Kühlschrank, Gewürzschrank
+  chimney: group(scene),   // Kaminwand mit Holzschrank
+  window: group(scene),    // Fensterwand
+  shaft: group(scene),     // Kamin (Spülseite + Kaminseite)
+  corner: group(scene),    // Eckschrank (Spülseite + Herdseite)
+};
+const wallMeshes = [];
+const wall = (...a) => wallMeshes.push(bx(...a));
+
+// ---------- Wände ----------
+CUR = G.back;    wall(-0.12,W+0.12, 0,H, -0.12,0, M.wall);
+CUR = G.stove;   wall(-0.12,0, 0,H, 0,L, M.wall);
+CUR = G.chimney; wall(W,W+0.12, 0,H, 0,L, M.wall);
+CUR = G.shaft;   wall(CH.x0,W, 0,H, 0,CH.z1, M.wall);   // zugemauerter Kamin
+// Steckdose auf der 36-cm-Seite vom Kamin
+box(0.08,0.08,0.012, M.white, 2.45, 1.08, CH.z1+0.006);
+box(0.04,0.04,0.004, mat(0xd8d8d8), 2.45, 1.08, CH.z1+0.014, CUR, false);
+
+// Fensterwand mit Fenster (Heizkörper weggelassen)
+CUR = G.window;
+const WIN = {x0:1.15, x1:2.30, y0:0.90, y1:2.45};
+wall(-0.12,WIN.x0, 0,H, L,L+0.12, M.wall);
+wall(WIN.x1,W+0.12, 0,H, L,L+0.12, M.wall);
+wall(WIN.x0,WIN.x1, 0,WIN.y0, L,L+0.12, M.wall);
+wall(WIN.x0,WIN.x1, WIN.y1,H, L,L+0.12, M.wall);
+{
+  const f = 0.06, zf0 = L+0.03, zf1 = L+0.09, tr = 2.02, mx = (WIN.x0+WIN.x1)/2;
+  bx(WIN.x0,WIN.x1, WIN.y0,WIN.y0+f, zf0,zf1, M.white);
+  bx(WIN.x0,WIN.x1, WIN.y1-f,WIN.y1, zf0,zf1, M.white);
+  bx(WIN.x0,WIN.x0+f, WIN.y0,WIN.y1, zf0,zf1, M.white);
+  bx(WIN.x1-f,WIN.x1, WIN.y0,WIN.y1, zf0,zf1, M.white);
+  bx(WIN.x0,WIN.x1, tr,tr+f, zf0,zf1, M.white);
+  bx(mx-f/2,mx+f/2, WIN.y0,WIN.y1, zf0,zf1, M.white);
+  for (const yy of [1.30,1.66]) { bx(WIN.x0,mx, yy,yy+0.025, zf0+0.01,zf0+0.03, M.white); bx(mx,WIN.x1, yy,yy+0.025, zf0+0.01,zf0+0.03, M.white); }
+  bx(WIN.x0+f,WIN.x1-f, WIN.y0+f,WIN.y1-f, L+0.055,L+0.06, M.pane, CUR, false);
+  bx(mx+0.05,mx+0.08, 1.30,1.36, zf0-0.03,zf0, M.steel, CUR, false);
+  bx(WIN.x0-0.05,WIN.x1+0.05, WIN.y0-0.03,WIN.y0, L-0.18,L+0.03, M.sill);
+}
+
+// ---------- Herd-/Türwand ----------
+CUR = G.stove;
+// Tür 80 cm, Klinke auf der Kühlschrankseite, davor ca. 13 cm Platz für den Lichtschalter
+const DOOR = {z0:2.20, z1:3.00};
+bx(0,0.03, 0,2.02, DOOR.z0,DOOR.z1, M.door);
+bx(0,0.035, 2.02,2.08, DOOR.z0-0.06,DOOR.z1+0.06, M.white);
+bx(0,0.035, 0,2.02, DOOR.z0-0.06,DOOR.z0, M.white);
+bx(0,0.035, 0,2.02, DOOR.z1,DOOR.z1+0.06, M.white);
+cyl(.025,.03, M.steel, 0.045,1.05,DOOR.z0+0.07, CUR, [0,0,Math.PI/2]);
+cyl(.011,.13, M.steel, 0.07,1.05,DOOR.z0+0.13, CUR, [Math.PI/2,0,0]);
+box(0.012,0.08,0.08, M.white, 0.006, 1.05, 2.075);                    // Lichtschalter
+box(0.008,0.05,0.035, mat(0xeeeeee), 0.014, 1.05, 2.075, CUR, false);
+for (const z of [0.12, 0.20]){                                        // zwei Steckdosen rechts in der Ecke
+  box(0.012,0.08,0.08, M.white, 0.006, 1.06, z);
+  box(0.004,0.04,0.04, mat(0xd8d8d8), 0.014, 1.06, z, CUR, false);
+}
+
+// Unterschrank Herdseite: Ecke, Backofen 60, daneben schmaler Auszug (früher Weinregal)
+const OV = {z0:0.63, z1:1.23}, PU = {z0:1.23, z1:1.40};
+bx(0,0.56, 0,PL, 0,1.40, M.plinth);
+bx(0,0.58, PL,BT, 0,PU.z0, M.body);
+bx(0,0.02, PL,BT, PU.z0,PU.z1, M.inner, CUR, false);
+bx(0.555,0.58, 0.84,BT, 0.60,1.40, M.grip, CUR, false);
+const frontX = (z0,z1,y0,y1) => bx(0.58,0.60, y0+gap,y1-gap, z0+gap,z1-gap, M.front);
+frontX(0.60,OV.z0, 0.10,0.84);
+frontX(OV.z0,OV.z1, 0.10,0.24);
+bx(0.58,0.602, 0.25,0.84, OV.z0+0.005,OV.z1-0.005, M.black);
+bx(0.602,0.606, 0.31,0.71, OV.z0+0.04,OV.z1-0.04, M.glass, CUR, false);
+bx(0.602,0.606, 0.74,0.83, OV.z0+0.04,OV.z1-0.04, M.steel, CUR, false);
+cyl(.008,.46, M.steel, 0.63,0.72,(OV.z0+OV.z1)/2, CUR, [Math.PI/2,0,0]);
+// Auszug: Front + drei offene Böden (von beiden Seiten einsehbar), zieht nach vorn raus
+const pull = group();
+{
+  const w0 = PU.z0+0.006, w1 = PU.z1-0.022;
+  bx(0.58,0.60, 0.10+gap,0.84-gap, PU.z0+gap,PU.z1-gap, M.front, pull);
+  bx(0.06,0.58, 0.12,0.135, w0,w1, M.inner, pull);
+  for (const y of [0.38, 0.62]) bx(0.06,0.58, y,y+0.012, w0,w1, M.inner, pull);
+  bx(0.06,0.08, 0.12,0.80, w0,w1, M.inner, pull);                  // hintere Stütze, Seiten offen
+}
+// Arbeitsplatte + Kochfeld
+bx(0,0.62, BT,AP, 0,1.40, M.top);
+const HZ = (OV.z0+OV.z1)/2;
+bx(0.05,0.57, AP,AP+0.004, HZ-0.29,HZ+0.29, M.glass);
+for (const [x,dz,r] of [[0.18,-0.15,.08],[0.43,-0.15,.06],[0.18,0.15,.06],[0.43,0.15,.09]]){
+  const ring = new THREE.Mesh(new THREE.RingGeometry(r-.006, r, 40), new THREE.MeshBasicMaterial({color:0x777777}));
+  ring.rotation.x = -Math.PI/2; ring.position.set(x, AP+0.005, HZ+dz); CUR.add(ring);
+}
+// Kühlschrank: normaler Standkühlschrank, 60 breit, 58 tief, niedriger als die Tür
+const FR = {z0:1.41, z1:2.01, d:0.58, h:1.80};
+bx(0,FR.d, 0,FR.h, FR.z0,FR.z1, M.steel);
+bx(FR.d,FR.d+0.002, 1.12,1.13, FR.z0+0.01,FR.z1-0.01, M.grip, CUR, false);
+cyl(.011,.38, M.steel, FR.d+0.03,1.38,FR.z0+0.05);
+cyl(.011,.38, M.steel, FR.d+0.03,0.78,FR.z0+0.05);
+for (const y of [1.56,1.19,0.96,0.58]) bx(FR.d,FR.d+0.03, y,y+0.01, FR.z0+0.045,FR.z0+0.055, M.steel, CUR, false);
+// Steckdose für den Kühlschrank, direkt darüber
+box(0.012,0.08,0.08, M.white, 0.006, FR.h+0.15, (FR.z0+FR.z1)/2);
+box(0.004,0.04,0.04, mat(0xd8d8d8), 0.014, FR.h+0.15, (FR.z0+FR.z1)/2, CUR, false);
+
+// Gewürzschrank über dem Kochfeld, Haube unten eingebaut und hinter einer Trennwand versteckt
+const SP = {z0:0.75, z1:1.40}, HY = Y0+0.12;
+bx(0,0.33, Y1-T,Y1, SP.z0,SP.z1, M.body);
+bx(0,0.33, HY,HY+T, SP.z0,SP.z1, M.body);
+bx(0,0.33, HY,Y1, SP.z0,SP.z0+T, M.body);
+bx(0,0.33, HY,Y1, SP.z1-T,SP.z1, M.body);
+bx(0,0.33, Y0,HY, SP.z0,SP.z1, M.steel);
+bx(0.21,0.22, HY+T,Y1-T, SP.z0+T,SP.z1-T, M.inner);             // Trennwand
+bx(0.22,0.33, YM+0.05,YM+0.068, SP.z0+T,SP.z1-T, M.inner);      // Fachboden
+// Tür mit Scharnier auf der Kühlschrankseite, öffnet max. 90°, damit sie nicht gegen den Kühlschrank schlägt
+const spiceDoor = group(); spiceDoor.position.set(0.35, HY, SP.z1);
+const spW = SP.z1-SP.z0;
+box(T, Y1-HY-gap, spW-gap, M.front, -T/2, (Y1-HY)/2, -spW/2, spiceDoor);
+box(0.006, 0.16, 0.012, M.grip, 0.001, (Y1-HY)/2, -spW+0.03, spiceDoor, false);   // senkrechte Griffmulde
+const hood = group();
+bx(0.33,0.35, Y0+0.005,HY-0.005, SP.z0+0.005,SP.z1-0.005, M.front, hood);
+bx(0.06,0.35, Y0,Y0+0.008, SP.z0+0.01,SP.z1-0.01, M.steel, hood);
+for (const z of [HZ-0.15, HZ+0.15]){
+  const l = new THREE.Mesh(new THREE.CircleGeometry(0.018, 20), new THREE.MeshBasicMaterial({color:0xfff6d8}));
+  l.rotation.x = Math.PI/2; l.position.set(0.22, Y0-0.001, z); CUR.add(l);
+}
+const hobLight = new THREE.SpotLight(0xfff1d6, 3, 2, Math.PI/3, .6);
+hobLight.position.set(0.25, Y0-0.02, HZ); hobLight.target.position.set(0.3, AP, HZ);
+CUR.add(hobLight, hobLight.target);
+
+// ---------- Spülwand ----------
+CUR = G.back;
+bx(0.56,CH.x0, 0,PL, 0,0.56, M.plinth);
+bx(0.58,CH.x0, PL,BT, 0,0.02, M.inner, CUR, false);
+bx(0.58,CH.x0, PL,PL+0.018, 0.02,0.58, M.inner, CUR, false);
+bx(0.58,CH.x0, BT-0.018,BT, 0.02,0.58, M.inner, CUR, false);
+bx(CH.x0-0.018,CH.x0, PL,BT, 0,0.58, M.body);
+bx(0.58,0.60, PL,BT, 0,0.58, M.body);                       // Seitenwand zur Ecke
+for (const x of [1.05,1.65]) bx(x-0.009,x+0.009, PL,BT, 0.02,0.58, M.inner);
+bx(0.60,CH.x0, 0.84,BT, 0.555,0.58, M.grip, CUR, false);
+bx(0.60,1.05, 0.40,0.42, 0.555,0.58, M.grip, CUR, false);
+bx(0.60,1.05, 0.70,0.72, 0.555,0.58, M.grip, CUR, false);
+bx(0.62,CH.x0, BT,AP, 0,0.62, M.top);
+
+// Drei Schubladen, einzeln: oben flach für Besteck, darunter zwei große (leer)
+const drawers = [];
+for (const [y0,y1] of [[0.72,0.84],[0.42,0.70],[0.10,0.40]]){
+  const g = group();
+  bx(0.60+gap,1.05-gap, y0+gap,y1-gap, 0.58,0.60, M.front, g);
+  const ty0 = y0+0.02, ty1 = y1-0.03;
+  bx(0.63,1.02, ty0,ty0+0.012, 0.12,0.58, M.inner, g);
+  bx(0.63,0.642, ty0,ty1, 0.12,0.58, M.inner, g);
+  bx(1.008,1.02, ty0,ty1, 0.12,0.58, M.inner, g);
+  bx(0.63,1.02, ty0,ty1, 0.12,0.132, M.inner, g);
+  drawers.push(g);
+}
+
+// Spülmaschine in der Mitte, Klappe geht nach unten auf
+{
+  const s = M.steel, x0 = 1.065, x1 = 1.635;
+  bx(x0,x1, PL+0.02,0.83, 0.03,0.04, s, CUR, false);
+  bx(x0,x0+0.01, PL+0.02,0.83, 0.03,0.57, s, CUR, false);
+  bx(x1-0.01,x1, PL+0.02,0.83, 0.03,0.57, s, CUR, false);
+  bx(x0,x1, PL+0.02,PL+0.03, 0.03,0.57, s, CUR, false);
+  bx(x0,x1, 0.82,0.83, 0.03,0.57, s, CUR, false);
+  const rm = mat(0x8a8f94, {metalness:.4});
+  for (const ry of [0.20, 0.52]){
+    bx(x0+0.02,x1-0.02, ry,ry+0.008, 0.06,0.55, rm);
+    for (const zz of [0.06,0.545]) bx(x0+0.02,x1-0.02, ry,ry+0.06, zz,zz+0.006, rm, CUR, false);
+  }
+}
+const dwDoor = group(); dwDoor.position.set(1.35, PL+0.003, 0.60);
+box(0.60-2*gap, 0.74-2*gap, T, M.front, 0, 0.37, -T/2, dwDoor);
+box(0.54, 0.66, 0.006, M.steel, 0, 0.37, -T-0.003, dwDoor, false);
+
+// Spüle + Wasserhahn + Siphon
+const SX = 1.96;
+bx(SX-0.22,SX+0.22, AP-0.002,AP+0.005, 0.07,0.53, M.black);
+bx(SX-0.18,SX+0.18, AP+0.002,AP+0.006, 0.12,0.49, mat(0x080808,{roughness:.5}), CUR, false);
+cyl(.022,.004, M.steel, SX,AP+0.007,0.36);
+cyl(.026,.05, M.black, SX,AP+0.03,0.05);
+cyl(.013,.33, M.black, SX,AP+0.19,0.05);
+{
+  const arc = new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.013, 12, 32, Math.PI), M.black);
+  arc.rotation.y = Math.PI/2; arc.position.set(SX, AP+0.355, 0.135); arc.castShadow = true; CUR.add(arc);
+}
+cyl(.013,.07, M.black, SX,AP+0.32,0.22);
+bx(SX+0.02,SX+0.08, AP+0.15,AP+0.16, 0.04,0.06, M.black, CUR, false);
+cyl(.022,.18, M.pipe, SX, AP-0.11, 0.36);
+{
+  const trap = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.02, 10, 24, Math.PI), M.pipe);
+  trap.rotation.set(0, Math.PI/2, Math.PI); trap.position.set(SX, 0.71, 0.31); CUR.add(trap);
+}
+cyl(.02,.10, M.pipe, SX, 0.76, 0.26);
+cyl(.02,.25, M.pipe, SX, 0.81, 0.135, CUR, [Math.PI/2,0,0]);
+// Spülenschrank-Tür: Scharnier links (Spülmaschinenseite), sonst schlägt sie gegen den Holzschrank
+const sinkDoor = group(); sinkDoor.position.set(1.65+gap, PL+gap, 0.60);
+box(CH.x0-1.65-2*gap, 0.74-2*gap, T, M.front, (CH.x0-1.65)/2, 0.37, -T/2, sinkDoor);
+
+// Zwei Hängeschränke, je EIN Schrank: obere Klappe schwenkt hoch, die untere wird mitgezogen,
+// bleibt senkrecht und steht dann vorn vor dem Schrank
+function carcass(x0, x1){
+  bx(x0,x0+T, Y0,Y1, 0,D-T, M.front);
+  bx(x1-T,x1, Y0,Y1, 0,D-T, M.front);
+  bx(x0,x1, Y1-T,Y1, 0,D-T, M.front);
+  bx(x0,x1, Y0,Y0+T, 0,D-T, M.front);
+  bx(x0+T,x1-T, Y0+T,Y1-T, 0,0.012, M.inner, CUR, false);
+  bx(x0+T,x1-T, YM-0.009,YM+0.009, 0.01,D-T-0.01, M.inner);
+  bx(x0+T,x0+T+0.002, Y0+T,Y1-T, 0.01,D-T, M.inner, CUR, false);
+  bx(x1-T-0.002,x1-T, Y0+T,Y1-T, 0.01,D-T, M.inner, CUR, false);
+  bx(x0+T,x1-T, Y0+T,Y0+T+0.002, 0.01,D-T, M.inner, CUR, false);
+  bx(x0+T,x1-T, Y1-T-0.002,Y1-T, 0.01,D-T, M.inner, CUR, false);
+}
+const flapRigs = [];
+for (const [x0,x1] of [[0.75,1.51],[1.51,CH.x0]]){
+  carcass(x0, x1);
+  const w = x1-x0-2*gap, hh = (Y1-Y0)/2 - gap;
+  const upper = group(); upper.position.set((x0+x1)/2, Y1, D);
+  box(w, hh, T, M.front, 0, -hh/2, -T/2, upper);
+  const lower = group(upper); lower.position.set(0, -hh-gap*2, 0);
+  box(w, hh, T, M.front, 0, -hh/2, -T/2, lower);
+  box(0.16, 0.012, 0.006, M.grip, 0, -hh+0.012, 0.001, lower, false);
+  flapRigs.push({upper, lower});
+}
+
+// ---------- Eckschrank über Eck: zwei Türen gehen von der Mitte nach außen auf ----------
+CUR = G.corner;
+bx(0,0.75, Y0,Y1, 0,0.33, M.body);
+bx(0,0.33, Y0,Y1, 0.33,0.75, M.body);
+bx(0.35,0.73, Y0+T,Y1-T, 0.33,0.332, M.inner, CUR, false);
+bx(0.33,0.332, Y0+T,Y1-T, 0.35,0.73, M.inner, CUR, false);
+bx(0.35,0.73, YM-0.01,YM+0.01, 0.20,0.333, M.inner);
+bx(0.20,0.333, YM-0.01,YM+0.01, 0.35,0.73, M.inner);
+const cornerFront = group(); cornerFront.position.set(0.75, Y0, 0.35);
+box(0.40-gap, Y1-Y0-gap, T, M.front, -0.20, (Y1-Y0)/2, -T/2, cornerFront);
+sphere(.014, M.steel, -0.37, (Y1-Y0)*0.18, 0.012, cornerFront);
+const cornerSide = group(); cornerSide.position.set(0.35, Y0, 0.75);
+box(T, Y1-Y0-gap, 0.40-gap, M.front, -T/2, (Y1-Y0)/2, -0.20, cornerSide);
+sphere(.014, M.steel, 0.012, (Y1-Y0)*0.18, -0.37, cornerSide);
+
+// ---------- Kaminwand: Holzschrank, max. 36 cm tief, bündig mit dem Kamin ----------
+CUR = G.chimney;
+// Steckdose beim Tisch
+box(0.012,0.08,0.08, M.white, W-0.006, 0.30, 2.02);
+box(0.004,0.04,0.04, mat(0xd8d8d8), W-0.014, 0.30, 2.02, CUR, false);
+const P = {x0:CH.x0, x1:W, z0:0.95, z1:1.75};
+const pc = (P.z0+P.z1)/2;
+for (const [x,z] of [[P.x0+0.04,P.z0+0.04],[P.x0+0.04,P.z1-0.04],[P.x1-0.04,P.z0+0.04],[P.x1-0.04,P.z1-0.04]]) sphere(.04, M.pine, x, 0.04, z);
+bx(P.x0+0.01,P.x1, 0.07,1.25, P.z0,P.z1, M.pine);
+bx(P.x0,P.x1, 1.25,1.28, P.z0-0.02,P.z1+0.02, M.pine);
+bx(P.x0,P.x1, 0.07,0.11, P.z0-0.01,P.z1+0.01, M.pine);
+{
+  const s = new THREE.Shape();
+  s.moveTo(-0.37,0); s.lineTo(0.37,0); s.lineTo(0.37,0.05);
+  s.quadraticCurveTo(0.18,0.06,0.08,0.10); s.quadraticCurveTo(0,0.12,-0.08,0.10);
+  s.quadraticCurveTo(-0.18,0.06,-0.37,0.05); s.lineTo(-0.37,0);
+  const g = new THREE.ExtrudeGeometry(s, {depth:0.022, bevelEnabled:false});
+  const m = new THREE.Mesh(g, M.pine); m.rotation.y = Math.PI/2; m.position.set(P.x1-0.025,1.28,pc);
+  m.castShadow = true; m.add(new THREE.LineSegments(new THREE.EdgesGeometry(g), edgeMat)); CUR.add(m);
+}
+const dz0 = pc+0.01, dz1 = P.z1-0.02;    // Tür
+const cz0 = P.z0+0.02, cz1 = pc-0.01;    // Fach + Schubladen
+bx(P.x0-0.01,P.x0+0.01, 0.13,1.23, dz0,dz1, M.pine);
+bx(P.x0-0.018,P.x0-0.01, 0.22,1.14, dz0+0.06,dz1-0.06, M.pine);
+sphere(.017, M.pine, P.x0-0.03, 0.68, dz0+0.03);
+bx(P.x0+0.06,P.x0+0.062, 0.87,1.23, cz0,cz1, M.pineDark, CUR, false);
+bx(P.x0-0.005,P.x0+0.06, 0.86,0.875, cz0,cz1, M.pineDark, CUR, false);
+bx(P.x0-0.01,P.x0+0.33, 1.04,1.055, cz0,cz1, M.pine);
+for (const [y0,y1] of [[0.13,0.35],[0.37,0.60],[0.62,0.85]]){
+  bx(P.x0-0.012,P.x0+0.01, y0,y1, cz0,cz1, M.pine);
+  sphere(.016, M.pine, P.x0-0.03, (y0+y1)/2, (cz0+cz1)/2);
+}
+CUR = scene;
+
+// Wände werfen keine Schatten, sonst laufen schräge Schattenkanten über die Fronten
+wallMeshes.forEach(m => { m.castShadow = false; });
+
+// ---------- Steuerung ----------
+const state = {flaps:0, corner:0, spice:0, hood:0, d0:0, d1:0, d2:0, dw:0, sink:0, pull:0};
+const target = {...state};
+const deg = Math.PI/180;
+const clamp01 = v => Math.max(0, Math.min(1, v));
+function apply(){
+  for (const r of flapRigs){
+    r.upper.rotation.x = -state.flaps*90*deg;
+    r.lower.rotation.x = state.flaps*90*deg;   // untere Klappe bleibt senkrecht
+  }
+  cornerFront.rotation.y = clamp01(state.corner*2)*100*deg;       // erst vorn
+  cornerSide.rotation.y = -clamp01(state.corner*2-1)*100*deg;     // dann seitlich
+  spiceDoor.rotation.y = -state.spice*90*deg;
+  hood.position.x = state.hood*0.17;
+  hobLight.intensity = 0.5 + state.hood*4;
+  drawers.forEach((g, i) => g.position.z = state['d'+i]*0.40);
+  dwDoor.rotation.x = state.dw*88*deg;
+  sinkDoor.rotation.y = -state.sink*90*deg;
+  pull.position.x = state.pull*0.45;
+}
+const views = {
+  a: {pos:[2.3,3.4,4.1], tgt:[0.9,0.9,0.7]},
+  b: {pos:[1.3,1.65,4.4], tgt:[1.2,1.0,0.3]},
+  c: {pos:[3.5,2.4,1.7], tgt:[0.2,1.15,1.0]},
+  e: {pos:[-1.0,2.3,1.6], tgt:[2.4,0.9,1.2]},
+  d: {pos:[1.3,3.0,-1.1], tgt:[1.4,0.9,2.7]},
+};
+let camTween = null;
+function setView(k, instant){
+  const v = views[k];
+  if (instant){ camera.position.set(...v.pos); controls.target.set(...v.tgt); return; }
+  camTween = {t:0, p0:camera.position.clone(), t0:controls.target.clone(), p1:new THREE.Vector3(...v.pos), t1:new THREE.Vector3(...v.tgt)};
+}
+function updateWalls(){
+  const p = camera.position;
+  const back = p.z > 0, stove = p.x > 0, chim = p.x < W, win = p.z < L;
+  G.back.visible = back;
+  G.stove.visible = stove;
+  G.chimney.visible = chim;
+  G.window.visible = win;
+  G.shaft.visible = back && chim;
+  G.corner.visible = back && stove;
+}
+
+const q = new URLSearchParams(location.search);
+for (const k of Object.keys(state)) if (q.get(k)==='1') state[k] = target[k] = 1;
+setView(q.get('view') || 'a', true);
+apply();
+
+document.querySelectorAll('[data-t]').forEach(b => {
+  b.classList.toggle('on', target[b.dataset.t]===1);
+  b.onclick = () => { const k = b.dataset.t; target[k] = target[k] ? 0 : 1; b.classList.toggle('on', target[k]===1); };
+});
+document.querySelectorAll('[data-v]').forEach(b => b.onclick = () => setView(b.dataset.v));
+document.getElementById('save').onclick = () => {
+  renderer.render(scene, camera);
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = 'kueche_' + new Date().toISOString().slice(0,10) + '.png';
+  a.click();
+};
+document.getElementById('hide').onclick = () => document.body.classList.add('hidden');
+document.getElementById('show').onclick = () => document.body.classList.remove('hidden');
+
+function resize(){
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w/h; camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize); resize();
+
+const ease = t => t<.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2;
+let last = performance.now();
+renderer.setAnimationLoop(now => {
+  const dt = Math.min((now-last)/1000, .05); last = now;
+  let moving = false;
+  for (const k in state){
+    const d = target[k]-state[k];
+    if (Math.abs(d) > 1e-3){ state[k] += Math.sign(d)*Math.min(Math.abs(d), dt*(k==='corner' ? 0.8 : 1.2)); moving = true; }
+  }
+  if (moving) apply();
+  if (camTween){
+    camTween.t = Math.min(1, camTween.t + dt*1.4);
+    const e = ease(camTween.t);
+    camera.position.lerpVectors(camTween.p0, camTween.p1, e);
+    controls.target.lerpVectors(camTween.t0, camTween.t1, e);
+    if (camTween.t >= 1) camTween = null;
+  }
+  controls.update();
+  updateWalls();
+  renderer.render(scene, camera);
+  window.__ready = true;
+});
+</script>
+</body>
+</html>
