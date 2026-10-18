@@ -250,6 +250,18 @@ wall(WIN.x0,WIN.x1, WIN.y1,H, L,L+0.12, M.wall);
   bx(mx+0.05,mx+0.08, 1.30,1.36, zf0-0.03,zf0, M.steel, CUR, false);
   bx(WIN.x0-0.05,WIN.x1+0.05, WIN.y0-0.03,WIN.y0, L-0.18,L+0.03, M.sill);
 }
+// Heizkörper mittig unter dem Fenster, etwas schmaler als das Fenster
+{
+  const hx0 = (WIN.x0+WIN.x1)/2 - 0.50, hx1 = (WIN.x0+WIN.x1)/2 + 0.50, hy0 = 0.15, hy1 = 0.72;
+  const hz0 = L-0.10, hz1 = L-0.035, rad = mat(0xf7f7f5, {roughness:.4});
+  bx(hx0,hx1, hy0,hy1, hz0+0.03,hz1, rad);                                  // hintere Platte
+  for (let x = hx0+0.01; x < hx1-0.02; x += 0.05) bx(x,x+0.025, hy0+0.01,hy1-0.01, hz0,hz0+0.03, rad);   // Rippen
+  bx(hx0,hx1, hy1-0.012,hy1, hz0,hz0+0.03, rad);                            // Abdeckung oben
+  cyl(.012,.15, M.steel, hx1+0.03, hy0-0.03, hz1-0.015);                     // Anschlussrohre
+  cyl(.012,.15, M.steel, hx0-0.03, hy0-0.03, hz1-0.015);
+  cyl(.022,.05, M.white, hx1+0.03, hy1-0.04, hz1-0.015);                     // Thermostat
+  cyl(.016,.03, M.white, hx1+0.03, hy1-0.06, hz1-0.015, CUR, [Math.PI/2,0,0]);
+}
 
 // ---------- Herd-/Türwand ----------
 CUR = G.stove;
