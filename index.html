@@ -51,6 +51,10 @@
     <button data-t="tray">Blechschublade</button>
     <button data-t="buffet">Buffet</button>
   </div>
+  <h2>Möbel</h2>
+  <div class="row">
+    <button data-t="table">Tisch + Stühle</button>
+  </div>
   <h2>Ansicht</h2>
   <div class="row">
     <button data-v="a">Von oben</button>
@@ -526,11 +530,43 @@ bx(fx,P.x1-0.04, 0.72,0.83, pzB-0.045,pzB-0.03, M.pine, buffetDrawer);
 box(0.012, 0.012, 0.14, M.steel, fx-T-0.012, 0.775, (P.z0+pzB)/2, buffetDrawer);
 CUR = scene;
 
+// ---------- Tisch mit zwei Stühlen unter dem Fenster (wie im Video), ausblendbar ----------
+const tableGroup = group(scene);
+CUR = tableGroup;
+{
+  const beech = mat(0xd6a66c, {roughness:.5}), cushion = mat(0xe7dcc3, {roughness:.9});
+  const TB = {x0:1.20, x1:2.10, z0:2.33, z1:3.03, h:0.77};
+  bx(TB.x0,TB.x1, TB.h-0.04,TB.h, TB.z0,TB.z1, beech);
+  for (const x of [TB.x0+0.03, TB.x1-0.09]) for (const z of [TB.z0+0.03, TB.z1-0.09])
+    bx(x,x+0.06, 0,TB.h-0.04, z,z+0.06, beech);
+  bx(TB.x0+0.09,TB.x1-0.09, TB.h-0.12,TB.h-0.04, TB.z0+0.04,TB.z0+0.06, beech);     // Zarge
+  bx(TB.x0+0.09,TB.x1-0.09, TB.h-0.12,TB.h-0.04, TB.z1-0.06,TB.z1-0.04, beech);
+  bx(TB.x0+0.04,TB.x0+0.06, TB.h-0.12,TB.h-0.04, TB.z0+0.09,TB.z1-0.09, beech);
+  bx(TB.x1-0.06,TB.x1-0.04, TB.h-0.12,TB.h-0.04, TB.z0+0.09,TB.z1-0.09, beech);
+  // Stuhl: Vorderseite zeigt lokal nach +z, wird zum Tisch gedreht
+  function chair(cx, cz, rotY){
+    const c = group(); c.position.set(cx, 0, cz); c.rotation.y = rotY;
+    const r = 0.20, lw = 0.035, sh = 0.45;
+    for (const x of [-r, r-lw]){
+      bx(x,x+lw, 0,sh, r-lw,r, beech, c);           // Vorderbeine
+      bx(x,x+lw, 0,0.95, -r,-r+lw, beech, c);       // Hinterbeine gehen bis zur Lehne
+    }
+    bx(-r,r, sh,sh+0.03, -r+lw,r, beech, c);         // Sitz
+    bx(-r+0.02,r-0.02, sh+0.03,sh+0.07, -r+lw+0.01,r-0.02, cushion, c);
+    bx(-r+lw,r-lw, 0.89,0.95, -r,-r+lw, beech, c);   // obere Lehne
+    for (let i=0;i<4;i++){ const x = -0.12 + i*0.075; bx(x,x+0.025, sh+0.08,0.89, -r+0.005,-r+0.025, beech, c); }
+    for (const x of [-r, r-lw]) bx(x,x+lw, 0.12,0.15, -r+lw,r-lw, beech, c);   // Querstreben
+  }
+  chair(TB.x0-0.12, (TB.z0+TB.z1)/2, Math.PI/2);    // links, schaut zum Tisch
+  chair(TB.x1+0.12, (TB.z0+TB.z1)/2, -Math.PI/2);   // rechts
+}
+CUR = scene;
+
 // Wände werfen keine Schatten, sonst laufen schräge Schattenkanten über die Fronten
 wallMeshes.forEach(m => { m.castShadow = false; });
 
 // ---------- Steuerung ----------
-const state = {flaps:0, corner:0, spice:0, hood:0, d0:0, d1:0, d2:0, dw:0, sink:0, pull:0, tray:0, led:0, buffet:0, hl:0};
+const state = {flaps:0, corner:0, spice:0, hood:0, d0:0, d1:0, d2:0, dw:0, sink:0, pull:0, tray:0, led:0, buffet:0, hl:0, table:1};
 const target = {...state};
 const deg = Math.PI/180;
 const clamp01 = v => Math.max(0, Math.min(1, v));
@@ -549,6 +585,7 @@ function apply(){
   dwDoor.rotation.x = state.dw*88*deg;
   sinkDoor.rotation.y = -state.sink*90*deg;
   pull.position.x = state.pull*0.45;
+  tableGroup.visible = state.table > 0.5;
   tray.position.x = state.tray*0.40;
   buffetDoors.forEach(d => d.g.rotation.y = -d.dir*state.buffet*100*deg);
   buffetDrawer.position.x = -state.buffet*0.25;
@@ -580,7 +617,7 @@ function updateWalls(){
 }
 
 const q = new URLSearchParams(location.search);
-for (const k of Object.keys(state)) if (q.get(k)==='1') state[k] = target[k] = 1;
+for (const k of Object.keys(state)) if (q.has(k)) state[k] = target[k] = q.get(k)==='1' ? 1 : 0;
 setView(q.get('view') || 'a', true);
 if (q.get('cam')) { camera.position.set(...q.get('cam').split(',').map(Number)); controls.target.set(...(q.get('tgt')||'1,0.5,0.5').split(',').map(Number)); }
 apply();
