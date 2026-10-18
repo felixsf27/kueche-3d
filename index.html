@@ -155,20 +155,24 @@ function sphere(r, m, x, y, z, parent=CUR){
   parent.add(mesh);
   return mesh;
 }
-// Front mit eingefräster Griffmulde oben (offene Tasche zum Reingreifen). Profil im Schnitt (x = Tiefe, hinten 0, vorn T), extrudiert über die Breite.
-function gripFront(len, h, m, parent=CUR){
-  // Tasche oben offen: vorn eine 4 mm Lippe, dahinter 12 mm breite Mulde,
-  // vorn 1 cm tief, Boden fällt im 40°-Winkel nach hinten ab
-  const t = 0.02, lip = 0.004, wPk = 0.012, drop = 0.010, bev = wPk*Math.tan(40*Math.PI/180);
-  const s = new THREE.Shape();
-  s.moveTo(0,0); s.lineTo(t,0); s.lineTo(t,h); s.lineTo(t-lip,h);
-  s.lineTo(t-lip,h-drop); s.lineTo(t-lip-wPk,h-drop-bev); s.lineTo(t-lip-wPk,h); s.lineTo(0,h); s.lineTo(0,0);
+// Front mit Griffmulde oben: schwarze Metallschiene im U-Profil, oben offen zum Reingreifen.
+// Profil im Schnitt (x = Tiefe, hinten 0, vorn T), über die Breite extrudiert.
+const railMat = mat(0x1b1b1b, {metalness:.7, roughness:.35});
+function profileMesh(pts, len, m, parent){
+  const s = new THREE.Shape(); s.moveTo(...pts[0]); for (const p of pts.slice(1)) s.lineTo(...p); s.lineTo(...pts[0]);
   const g = new THREE.ExtrudeGeometry(s, {depth:len, bevelEnabled:false});
   const mesh = new THREE.Mesh(g, m);
   mesh.castShadow = mesh.receiveShadow = true;
   mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(g, 20), edgeMat));
   parent.add(mesh);
   return mesh;
+}
+function gripFront(len, h, m, parent=CUR){
+  const t = 0.02, uh = 0.022, w = 0.002;      // Schiene 22 mm hoch, 2 mm Wandstärke
+  const g = new THREE.Group(); parent.add(g);
+  profileMesh([[0,0],[t,0],[t,h-uh],[0,h-uh]], len, m, g);
+  profileMesh([[0,h-uh],[t,h-uh],[t,h],[t-w,h],[t-w,h-uh+w],[w,h-uh+w],[w,h],[0,h]], len, railMat, g);
+  return g;
 }
 const group = (parent=CUR) => { const g = new THREE.Group(); parent.add(g); return g; };
 
