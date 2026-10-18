@@ -78,8 +78,8 @@ scene.background = new THREE.Color(0xf1efeb);
 const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 50);
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
-controls.maxPolarAngle = Math.PI * 0.49;
-controls.minDistance = 0.5;
+controls.maxPolarAngle = Math.PI * 0.95;   // auch von unten unter Schränke schauen
+controls.minDistance = 0.2;
 controls.maxDistance = 9;
 
 // Licht
@@ -146,6 +146,19 @@ function sphere(r, m, x, y, z, parent=CUR){
   const mesh = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 14), m);
   mesh.position.set(x, y, z);
   mesh.castShadow = true;
+  parent.add(mesh);
+  return mesh;
+}
+// Front mit eingefräster Griffmulde oben: von der Oberkante 1 cm senkrecht nach unten,
+// dann im 40°-Winkel zurück zur Vorderseite. Profil im Schnitt (x = Tiefe, hinten 0, vorn T), extrudiert über die Breite.
+function gripFront(len, h, m, parent=CUR){
+  const t = 0.02, dIn = 0.012, drop = 0.010, bev = dIn*Math.tan(40*Math.PI/180);
+  const s = new THREE.Shape();
+  s.moveTo(0,0); s.lineTo(t,0); s.lineTo(t,h-drop-bev); s.lineTo(t-dIn,h-drop); s.lineTo(t-dIn,h); s.lineTo(0,h); s.lineTo(0,0);
+  const g = new THREE.ExtrudeGeometry(s, {depth:len, bevelEnabled:false});
+  const mesh = new THREE.Mesh(g, m);
+  mesh.castShadow = mesh.receiveShadow = true;
+  mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(g, 20), edgeMat));
   parent.add(mesh);
   return mesh;
 }
@@ -248,12 +261,11 @@ bx(0.555,0.58, 0.84,BT, 0.60,PU.z1, M.grip, CUR, false);
 const frontX = (z0,z1,y0,y1) => bx(0.58,0.60, y0+gap,y1-gap, z0+gap,z1-gap, M.front);
 // Blechschublade unter dem Ofen
 const tray = group();
-bx(0.58,0.60, 0.10+gap,0.24-gap, OV.z0+gap,OV.z1-gap, M.front, tray);
-bx(0.6,0.6015, 0.24-0.032,0.24-0.018, OV.z0+0.01,OV.z1-0.01, M.grip, tray, false);   // Griffmulde
+gripFront(OV.z1-OV.z0-2*gap, 0.14-2*gap, M.front, tray).position.set(0.58, 0.10+gap, OV.z0+gap);
 bx(0.10,0.58, 0.12,0.132, OV.z0+0.03,OV.z1-0.03, M.inner, tray);
-bx(0.10,0.58, 0.12,0.21, OV.z0+0.03,OV.z0+0.042, M.inner, tray);
-bx(0.10,0.58, 0.12,0.21, OV.z1-0.042,OV.z1-0.03, M.inner, tray);
-bx(0.10,0.112, 0.12,0.21, OV.z0+0.03,OV.z1-0.03, M.inner, tray);
+bx(0.10,0.58, 0.132,0.21, OV.z0+0.03,OV.z0+0.042, M.inner, tray);
+bx(0.10,0.58, 0.132,0.21, OV.z1-0.042,OV.z1-0.03, M.inner, tray);
+bx(0.10,0.112, 0.132,0.21, OV.z0+0.042,OV.z1-0.042, M.inner, tray);
 for (let i=0;i<2;i++) bx(0.14,0.55, 0.135+i*0.02,0.14+i*0.02, OV.z0+0.06,OV.z1-0.06, M.black, tray);   // Bleche
 bx(0.58,0.602, 0.25,0.84, OV.z0+0.005,OV.z1-0.005, M.black);
 bx(0.602,0.606, 0.31,0.71, OV.z0+0.04,OV.z1-0.04, M.glass, CUR, false);
@@ -264,8 +276,8 @@ const pull = group();
 {
   const w0 = PU.z0+0.006, w1 = PU.z1-0.022;
   bx(0.58,0.60, 0.10+gap,0.84-gap, PU.z0+gap,PU.z1-gap, M.front, pull);
-  bx(0.06,0.58, 0.12,0.135, w0,w1, M.inner, pull);
-  for (const y of [0.38, 0.62]) bx(0.06,0.58, y,y+0.012, w0,w1, M.inner, pull);
+  bx(0.08,0.58, 0.12,0.135, w0,w1, M.inner, pull);
+  for (const y of [0.38, 0.62]) bx(0.08,0.58, y,y+0.012, w0,w1, M.inner, pull);
   bx(0.06,0.08, 0.12,0.80, w0,w1, M.inner, pull);                  // hintere Stütze, Seiten offen
 }
 // Arbeitsplatte + Kochfeld
@@ -291,8 +303,8 @@ box(0.004,0.04,0.04, mat(0xd8d8d8), 0.014, FR.h+0.15, (FR.z0+FR.z1)/2, CUR, fals
 const SP = {z0:0.60, z1:1.35}, HY = Y0+0.12;
 bx(0,0.33, Y1-T,Y1, SP.z0,SP.z1, M.body);
 bx(0,0.33, HY,HY+T, SP.z0,SP.z1, M.body);
-bx(0,0.33, HY,Y1, SP.z0,SP.z0+T, M.body);
-bx(0,0.33, HY,Y1, SP.z1-T,SP.z1, M.body);
+bx(0,0.33, HY+T,Y1-T, SP.z0,SP.z0+T, M.body);
+bx(0,0.33, HY+T,Y1-T, SP.z1-T,SP.z1, M.body);
 bx(0,0.33, Y0,HY, SP.z0,SP.z1, M.steel);
 bx(0.21,0.22, HY+T,Y1-T, SP.z0+T,SP.z1-T, M.inner);             // Trennwand
 bx(0.22,0.33, YM+0.05,YM+0.068, SP.z0+T,SP.z1-T, M.inner);      // Fachboden
@@ -303,7 +315,7 @@ box(T, Y1-HY-gap, spW-gap, M.front, -T/2, (Y1-HY)/2, -spW/2, spiceDoor);
 box(0.006, 0.16, 0.012, M.grip, 0.001, (Y1-HY)/2, -spW+0.03, spiceDoor, false);   // senkrechte Griffmulde
 const hood = group();
 bx(0.33,0.35, Y0+0.005,HY-0.005, SP.z0+0.005,SP.z1-0.005, M.front, hood);
-bx(0.06,0.35, Y0,Y0+0.008, SP.z0+0.01,SP.z1-0.01, M.steel, hood);
+bx(0.06,0.35, Y0-0.006,Y0-0.001, SP.z0+0.01,SP.z1-0.01, M.steel, hood);
 for (const z of [HZ-0.15, HZ+0.15]){
   const l = new THREE.Mesh(new THREE.CircleGeometry(0.018, 20), new THREE.MeshBasicMaterial({color:0xfff6d8}));
   l.rotation.x = Math.PI/2; l.position.set(0.22, Y0-0.001, z); CUR.add(l);
@@ -315,12 +327,12 @@ CUR.add(hobLight, hobLight.target);
 // ---------- Spülwand ----------
 CUR = G.back;
 bx(0.56,CH.x0, 0,PL, 0,0.56, M.plinth);
-bx(0.58,CH.x0, PL,BT, 0,0.02, M.inner, CUR, false);
-bx(0.58,CH.x0, PL,PL+0.018, 0.02,0.58, M.inner, CUR, false);
-bx(0.58,CH.x0, BT-0.018,BT, 0.02,0.58, M.inner, CUR, false);
+bx(0.60,CH.x0-0.018, PL,BT, 0,0.02, M.inner, CUR, false);
+bx(0.60,CH.x0-0.018, PL,PL+0.018, 0.02,0.58, M.inner, CUR, false);
+bx(0.60,CH.x0-0.018, BT-0.018,BT, 0.02,0.58, M.inner, CUR, false);
 bx(CH.x0-0.018,CH.x0, PL,BT, 0,0.58, M.body);
 bx(0.58,0.60, PL,BT, 0,0.58, M.body);                       // Seitenwand zur Ecke
-for (const x of [1.05,1.65]) bx(x-0.009,x+0.009, PL,BT, 0.02,0.58, M.inner);
+for (const x of [1.05,1.65]) bx(x-0.009,x+0.009, PL+0.018,BT-0.018, 0.02,0.58, M.inner);
 bx(1.05,CH.x0, 0.84,BT, 0.555,0.58, M.grip, CUR, false);   // Griffleiste über Spülmaschine + Spülenschrank
 bx(0.60,CH.x0, BT,AP, 0,0.60, M.top);   // 167 × 60 bis zum Kamin
 
@@ -329,13 +341,13 @@ bx(0.60,CH.x0, BT,AP, 0,0.60, M.top);   // 167 × 60 bis zum Kamin
 const drawers = [];
 for (const [y0,y1] of [[0.71,0.877],[0.41,0.71],[0.10,0.41]]){
   const g = group();
-  bx(0.60+gap,1.05-gap, y0+gap,y1-gap, 0.58,0.60, M.front, g);
-  bx(0.61,1.04, y1-0.032,y1-0.018, 0.6,0.6015, M.grip, g, false);
+  const fm = gripFront((1.05-gap)-(0.60+gap), y1-y0-2*gap, M.front, g);
+  fm.rotation.y = -Math.PI/2; fm.position.set(1.05-gap, y0+gap, 0.58);
   const ty0 = y0+0.02, ty1 = y1-0.03;
   bx(0.63,1.02, ty0,ty0+0.012, 0.12,0.58, M.inner, g);
-  bx(0.63,0.642, ty0,ty1, 0.12,0.58, M.inner, g);
-  bx(1.008,1.02, ty0,ty1, 0.12,0.58, M.inner, g);
-  bx(0.63,1.02, ty0,ty1, 0.12,0.132, M.inner, g);
+  bx(0.63,0.642, ty0+0.012,ty1, 0.12,0.58, M.inner, g);
+  bx(1.008,1.02, ty0+0.012,ty1, 0.12,0.58, M.inner, g);
+  bx(0.642,1.008, ty0+0.012,ty1, 0.12,0.132, M.inner, g);
   drawers.push(g);
 }
 
@@ -386,14 +398,10 @@ box(CH.x0-1.65-2*gap, 0.74-2*gap, T, M.front, (CH.x0-1.65)/2, 0.37, -T/2, sinkDo
 function carcass(x0, x1){
   bx(x0,x0+T, Y0,Y1, 0,D-T, M.front);
   bx(x1-T,x1, Y0,Y1, 0,D-T, M.front);
-  bx(x0,x1, Y1-T,Y1, 0,D-T, M.front);
-  bx(x0,x1, Y0,Y0+T, 0,D-T, M.front);
+  bx(x0+T,x1-T, Y1-T,Y1, 0,D-T, M.front);
+  bx(x0+T,x1-T, Y0,Y0+T, 0,D-T, M.front);
   bx(x0+T,x1-T, Y0+T,Y1-T, 0,0.012, M.inner, CUR, false);
-  bx(x0+T,x1-T, YM-0.009,YM+0.009, 0.01,D-T-0.01, M.inner);
-  bx(x0+T,x0+T+0.002, Y0+T,Y1-T, 0.01,D-T, M.inner, CUR, false);
-  bx(x1-T-0.002,x1-T, Y0+T,Y1-T, 0.01,D-T, M.inner, CUR, false);
-  bx(x0+T,x1-T, Y0+T,Y0+T+0.002, 0.01,D-T, M.inner, CUR, false);
-  bx(x0+T,x1-T, Y1-T-0.002,Y1-T, 0.01,D-T, M.inner, CUR, false);
+  bx(x0+T,x1-T, YM-0.009,YM+0.009, 0.012,D-T-0.01, M.inner);
 }
 const flapRigs = [];
 const ledMat = new THREE.MeshStandardMaterial({color:0xfff6e0, emissive:0xfff0d0, emissiveIntensity:1});
@@ -445,21 +453,22 @@ for (const [x,z] of [[fx+0.05,P.z0+0.04],[fx+0.05,P.z1-0.04],[P.x1-0.04,P.z0+0.0
 // Unterteil
 bx(fx,P.x1, legH,bTop, P.z0,P.z0+pw, M.pine);
 bx(fx,P.x1, legH,bTop, P.z1-pw,P.z1, M.pine);
-bx(P.x1-pw,P.x1, legH,bTop, P.z0,P.z1, M.pineDark);
-bx(fx,P.x1, legH,legH+pw, P.z0,P.z1, M.pine);
-bx(fx,P.x1, legH,bTop, pzB-pw/2,pzB+pw/2, M.pine);
-bx(fx,P.x1, 0.69,0.69+pw, P.z0,pzB, M.pine);
-bx(fx+0.03,P.x1, 0.40,0.40+pw, P.z0+pw,P.z1-pw, M.pine);
+bx(P.x1-pw,P.x1, legH+pw,bTop, P.z0+pw,P.z1-pw, M.pineDark);
+bx(fx,P.x1, legH,legH+pw, P.z0+pw,P.z1-pw, M.pine);
+bx(fx,P.x1-pw, legH+pw,bTop, pzB-pw/2,pzB+pw/2, M.pine);
+bx(fx,P.x1-pw, 0.69,0.69+pw, P.z0+pw,pzB-pw/2, M.pine);
+bx(fx+0.03,P.x1-pw, 0.40,0.40+pw, P.z0+pw,pzB-pw/2, M.pine);
+bx(fx+0.03,P.x1-pw, 0.40,0.40+pw, pzB+pw/2,P.z1-pw, M.pine);
 bx(fx-0.02,P.x1, bTop,uBot, P.z0-0.01,P.z1+0.01, oak);                 // helle Platte
 // Oberteil
 bx(ux,P.x1, uBot,uTop, P.z0,P.z0+pw, M.pine);
 bx(ux,P.x1, uBot,uTop, P.z1-pw,P.z1, M.pine);
-bx(P.x1-pw,P.x1, uBot,uTop, P.z0,P.z1, M.pineDark);
-bx(ux,P.x1, uTop-pw,uTop, P.z0,P.z1, M.pine);
-bx(ux,P.x1, uBot,uTop, pzB-pw/2,pzB+pw/2, M.pine);
-bx(ux,P.x1, 1.27,1.27+pw, P.z0,pzB, M.pine);                          // über der offenen Nische
-bx(ux+0.02,P.x1, 1.62,1.62+pw, P.z0+pw,pzB, M.pine);
-for (const y of [1.30, 1.62]) bx(ux,P.x1, y,y+pw, pzB,P.z1, oak);       // offene Fächer rechts
+bx(P.x1-pw,P.x1, uBot,uTop-pw, P.z0+pw,P.z1-pw, M.pineDark);
+bx(ux,P.x1, uTop-pw,uTop, P.z0+pw,P.z1-pw, M.pine);
+bx(ux,P.x1-pw, uBot,uTop-pw, pzB-pw/2,pzB+pw/2, M.pine);
+bx(ux,P.x1-pw, 1.27,1.27+pw, P.z0+pw,pzB-pw/2, M.pine);              // über der offenen Nische
+bx(ux+0.02,P.x1-pw, 1.62,1.62+pw, P.z0+pw,pzB-pw/2, M.pine);
+for (const y of [1.30, 1.62]) bx(ux,P.x1-pw, y,y+pw, pzB+pw/2,P.z1-pw, oak);   // offene Fächer rechts
 
 const buffetDoors = [];
 function bdoor(hz, oz, y0, y1, xf, hy){
@@ -477,8 +486,8 @@ bdoor(pzB, pzM, 1.27, uTop, ux, 1.33);
 const buffetDrawer = group();
 bx(fx-T,fx, 0.69+gap,bTop-gap, P.z0+gap,pzB-gap, M.pine, buffetDrawer);
 bx(fx,P.x1-0.04, 0.71,0.72, P.z0+0.03,pzB-0.03, M.pine, buffetDrawer);
-bx(fx,P.x1-0.04, 0.71,0.83, P.z0+0.03,P.z0+0.045, M.pine, buffetDrawer);
-bx(fx,P.x1-0.04, 0.71,0.83, pzB-0.045,pzB-0.03, M.pine, buffetDrawer);
+bx(fx,P.x1-0.04, 0.72,0.83, P.z0+0.03,P.z0+0.045, M.pine, buffetDrawer);
+bx(fx,P.x1-0.04, 0.72,0.83, pzB-0.045,pzB-0.03, M.pine, buffetDrawer);
 box(0.012, 0.012, 0.14, M.steel, fx-T-0.012, 0.775, (P.z0+pzB)/2, buffetDrawer);
 CUR = scene;
 
@@ -537,6 +546,7 @@ function updateWalls(){
 const q = new URLSearchParams(location.search);
 for (const k of Object.keys(state)) if (q.get(k)==='1') state[k] = target[k] = 1;
 setView(q.get('view') || 'a', true);
+if (q.get('cam')) { camera.position.set(...q.get('cam').split(',').map(Number)); controls.target.set(...(q.get('tgt')||'1,0.5,0.5').split(',').map(Number)); }
 apply();
 
 document.querySelectorAll('[data-t]').forEach(b => {
