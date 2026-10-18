@@ -37,7 +37,8 @@
     <button data-t="corner">Eckschrank</button>
     <button data-t="spice">Gewürzschrank</button>
     <button data-t="hood">Haube ausziehen</button>
-    <button data-t="led">Licht</button>
+    <button data-t="led">Licht Klappen</button>
+    <button data-t="hl">Licht Haube</button>
   </div>
   <h2>Unten öffnen</h2>
   <div class="row">
@@ -316,8 +317,9 @@ box(0.006, 0.16, 0.012, M.grip, 0.001, (Y1-HY)/2, -spW+0.03, spiceDoor, false); 
 const hood = group();
 bx(0.33,0.35, Y0+0.005,HY-0.005, SP.z0+0.005,SP.z1-0.005, M.front, hood);
 bx(0.06,0.35, Y0-0.006,Y0-0.001, SP.z0+0.01,SP.z1-0.01, M.steel, hood);
+const hoodLampMat = new THREE.MeshBasicMaterial({color:0xfff6d8});
 for (const z of [HZ-0.15, HZ+0.15]){
-  const l = new THREE.Mesh(new THREE.CircleGeometry(0.018, 20), new THREE.MeshBasicMaterial({color:0xfff6d8}));
+  const l = new THREE.Mesh(new THREE.CircleGeometry(0.018, 20), hoodLampMat);
   l.rotation.x = Math.PI/2; l.position.set(0.22, Y0-0.001, z); CUR.add(l);
 }
 const hobLight = new THREE.SpotLight(0xfff1d6, 3, 2, Math.PI/3, .6);
@@ -495,7 +497,7 @@ CUR = scene;
 wallMeshes.forEach(m => { m.castShadow = false; });
 
 // ---------- Steuerung ----------
-const state = {flaps:0, corner:0, spice:0, hood:0, d0:0, d1:0, d2:0, dw:0, sink:0, pull:0, tray:0, led:1, buffet:0};
+const state = {flaps:0, corner:0, spice:0, hood:0, d0:0, d1:0, d2:0, dw:0, sink:0, pull:0, tray:0, led:1, buffet:0, hl:1};
 const target = {...state};
 const deg = Math.PI/180;
 const clamp01 = v => Math.max(0, Math.min(1, v));
@@ -508,7 +510,8 @@ function apply(){
   cornerSide.rotation.y = -clamp01(state.corner*2-1)*100*deg;     // dann seitlich
   spiceDoor.rotation.y = -state.spice*90*deg;
   hood.position.x = state.hood*0.17;
-  hobLight.intensity = 0.5 + state.hood*4;
+  hobLight.intensity = state.hl*(1.5 + state.hood*3);
+  hoodLampMat.color.setHex(state.hl > 0.5 ? 0xfff6d8 : 0x8a8a8a);
   drawers.forEach((g, i) => g.position.z = state['d'+i]*0.40);
   dwDoor.rotation.x = state.dw*88*deg;
   sinkDoor.rotation.y = -state.sink*90*deg;
