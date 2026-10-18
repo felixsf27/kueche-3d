@@ -249,6 +249,7 @@ const frontX = (z0,z1,y0,y1) => bx(0.58,0.60, y0+gap,y1-gap, z0+gap,z1-gap, M.fr
 // Blechschublade unter dem Ofen
 const tray = group();
 bx(0.58,0.60, 0.10+gap,0.24-gap, OV.z0+gap,OV.z1-gap, M.front, tray);
+bx(0.6,0.6015, 0.24-0.032,0.24-0.018, OV.z0+0.01,OV.z1-0.01, M.grip, tray, false);   // Griffmulde
 bx(0.10,0.58, 0.12,0.132, OV.z0+0.03,OV.z1-0.03, M.inner, tray);
 bx(0.10,0.58, 0.12,0.21, OV.z0+0.03,OV.z0+0.042, M.inner, tray);
 bx(0.10,0.58, 0.12,0.21, OV.z1-0.042,OV.z1-0.03, M.inner, tray);
@@ -320,16 +321,16 @@ bx(0.58,CH.x0, BT-0.018,BT, 0.02,0.58, M.inner, CUR, false);
 bx(CH.x0-0.018,CH.x0, PL,BT, 0,0.58, M.body);
 bx(0.58,0.60, PL,BT, 0,0.58, M.body);                       // Seitenwand zur Ecke
 for (const x of [1.05,1.65]) bx(x-0.009,x+0.009, PL,BT, 0.02,0.58, M.inner);
-bx(0.60,CH.x0, 0.84,BT, 0.555,0.58, M.grip, CUR, false);
-bx(0.60,1.05, 0.40,0.42, 0.555,0.58, M.grip, CUR, false);
-bx(0.60,1.05, 0.70,0.72, 0.555,0.58, M.grip, CUR, false);
+bx(1.05,CH.x0, 0.84,BT, 0.555,0.58, M.grip, CUR, false);   // Griffleiste über Spülmaschine + Spülenschrank
 bx(0.60,CH.x0, BT,AP, 0,0.60, M.top);   // 167 × 60 bis zum Kamin
 
-// Drei Schubladen, einzeln: oben flach für Besteck, darunter zwei große (leer)
+// Drei Schubladen, einzeln: oben flach für Besteck, darunter zwei große (leer).
+// Griffmulde in die Oberkante der Front gefräst, kein Griff
 const drawers = [];
-for (const [y0,y1] of [[0.72,0.84],[0.42,0.70],[0.10,0.40]]){
+for (const [y0,y1] of [[0.71,0.877],[0.41,0.71],[0.10,0.41]]){
   const g = group();
   bx(0.60+gap,1.05-gap, y0+gap,y1-gap, 0.58,0.60, M.front, g);
+  bx(0.61,1.04, y1-0.032,y1-0.018, 0.6,0.6015, M.grip, g, false);
   const ty0 = y0+0.02, ty1 = y1-0.03;
   bx(0.63,1.02, ty0,ty0+0.012, 0.12,0.58, M.inner, g);
   bx(0.63,0.642, ty0,ty1, 0.12,0.58, M.inner, g);
