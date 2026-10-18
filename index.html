@@ -340,12 +340,17 @@ CUR = G.back;
 bx(0.56,CH.x0, 0,PL, 0,0.56, M.plinth);
 bx(0.60,CH.x0-0.018, PL,BT, 0,0.02, M.inner, CUR, false);
 bx(0.60,CH.x0-0.018, PL,PL+0.018, 0.02,0.58, M.inner, CUR, false);
-bx(0.60,CH.x0-0.018, BT-0.018,BT, 0.02,0.58, M.inner, CUR, false);
+bx(0.60,1.65, BT-0.018,BT, 0.02,0.58, M.inner, CUR, false);   // über dem Spülenschrank offen, da hängt das Becken
 bx(CH.x0-0.018,CH.x0, PL,BT, 0,0.58, M.body);
 bx(0.58,0.60, PL,BT, 0,0.58, M.body);                       // Seitenwand zur Ecke
 for (const x of [1.05,1.65]) bx(x-0.009,x+0.009, PL+0.018,BT-0.018, 0.02,0.58, M.inner);
 bx(1.05,CH.x0, 0.84,BT, 0.555,0.58, M.grip, CUR, false);   // Griffleiste über Spülmaschine + Spülenschrank
-bx(0.60,CH.x0, BT,AP, 0,0.60, M.top);   // 167 × 60 bis zum Kamin
+// Arbeitsplatte 167 × 60 bis zum Kamin, mit Ausschnitt für die Spüle
+const SX = 1.96, SK = {x0:SX-0.22, x1:SX+0.22, z0:0.03, z1:0.55};
+bx(0.60,SK.x0, BT,AP, 0,0.60, M.top);
+bx(SK.x1,CH.x0, BT,AP, 0,0.60, M.top);
+bx(SK.x0,SK.x1, BT,AP, 0,SK.z0, M.top);
+bx(SK.x0,SK.x1, BT,AP, SK.z1,0.60, M.top);
 
 // Drei Schubladen, einzeln: oben flach für Besteck, darunter zwei große (leer).
 // Griffmulde in die Oberkante der Front gefräst, kein Griff
@@ -380,26 +385,41 @@ const dwDoor = group(); dwDoor.position.set(1.35, PL+0.003, 0.60);
 box(0.60-2*gap, 0.74-2*gap, T, M.front, 0, 0.37, -T/2, dwDoor);
 box(0.54, 0.66, 0.006, M.steel, 0, 0.37, -T-0.003, dwDoor, false);
 
-// Spüle + Wasserhahn + Siphon
-const SX = 1.96;
-bx(SX-0.22,SX+0.22, AP-0.002,AP+0.005, 0.07,0.53, M.black);
-bx(SX-0.18,SX+0.18, AP+0.002,AP+0.006, 0.12,0.49, mat(0x080808,{roughness:.5}), CUR, false);
-cyl(.022,.004, M.steel, SX,AP+0.007,0.36);
-cyl(.026,.05, M.black, SX,AP+0.03,0.05);
-cyl(.013,.33, M.black, SX,AP+0.19,0.05);
+// Spüle mit Hahnbank hinten: der Wasserhahn steht auf der Spüle, das Becken ist echt vertieft
+const sinkMat = mat(0x1a1a1a, {roughness:.55});
+const BW = {x0:SX-0.18, x1:SX+0.18, z0:0.15, z1:0.51, d:0.19};
+bx(SK.x0,SK.x1, AP,AP+0.006, SK.z0,BW.z0, sinkMat);                  // Hahnbank
+bx(SK.x0,SK.x1, AP,AP+0.006, BW.z1,SK.z1, sinkMat);
+bx(SK.x0,BW.x0, AP,AP+0.006, BW.z0,BW.z1, sinkMat);
+bx(BW.x1,SK.x1, AP,AP+0.006, BW.z0,BW.z1, sinkMat);
+bx(BW.x0-0.01,BW.x1+0.01, AP-BW.d,AP-BW.d+0.01, BW.z0-0.01,BW.z1+0.01, sinkMat);   // Beckenboden
+bx(BW.x0-0.01,BW.x0, AP-BW.d,AP, BW.z0,BW.z1, sinkMat);
+bx(BW.x1,BW.x1+0.01, AP-BW.d,AP, BW.z0,BW.z1, sinkMat);
+bx(BW.x0-0.01,BW.x1+0.01, AP-BW.d,AP, BW.z0-0.01,BW.z0, sinkMat);
+bx(BW.x0-0.01,BW.x1+0.01, AP-BW.d,AP, BW.z1,BW.z1+0.01, sinkMat);
+cyl(.035,.004, M.steel, SX,AP-BW.d+0.012,0.36);
+// Wasserhahn: niedriger Bogen, als Rohr modelliert
 {
-  const arc = new THREE.Mesh(new THREE.TorusGeometry(0.085, 0.013, 12, 32, Math.PI), M.black);
-  arc.rotation.y = Math.PI/2; arc.position.set(SX, AP+0.355, 0.135); arc.castShadow = true; CUR.add(arc);
+  const hz = 0.085, y0 = AP+0.006;
+  const path = new THREE.CurvePath();
+  path.add(new THREE.LineCurve3(new THREE.Vector3(SX,y0+0.03,hz), new THREE.Vector3(SX,y0+0.17,hz)));
+  path.add(new THREE.CubicBezierCurve3(new THREE.Vector3(SX,y0+0.17,hz), new THREE.Vector3(SX,y0+0.29,hz), new THREE.Vector3(SX,y0+0.29,hz+0.17), new THREE.Vector3(SX,y0+0.17,hz+0.17)));
+  path.add(new THREE.LineCurve3(new THREE.Vector3(SX,y0+0.17,hz+0.17), new THREE.Vector3(SX,y0+0.13,hz+0.17)));
+  const tube = new THREE.Mesh(new THREE.TubeGeometry(path, 64, 0.011, 16, false), M.black);
+  tube.castShadow = true; CUR.add(tube);
+  cyl(.026,.03, M.black, SX,y0+0.015,hz);
+  cyl(.013,.015, M.black, SX,y0+0.125,hz+0.17);                     // Strahlregler
+  cyl(.015,.04, M.black, SX+0.03,y0+0.07,hz, CUR, [0,0,Math.PI/2]);  // Hebel seitlich
+  bx(SX+0.045,SX+0.055, y0+0.07,y0+0.14, hz-0.006,hz+0.006, M.black, CUR, false);
 }
-cyl(.013,.07, M.black, SX,AP+0.32,0.22);
-bx(SX+0.02,SX+0.08, AP+0.15,AP+0.16, 0.04,0.06, M.black, CUR, false);
-cyl(.022,.18, M.pipe, SX, AP-0.11, 0.36);
+// Siphon unter dem Becken
+cyl(.022,.08, M.pipe, SX, AP-BW.d-0.04, 0.36);
 {
   const trap = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.02, 10, 24, Math.PI), M.pipe);
-  trap.rotation.set(0, Math.PI/2, Math.PI); trap.position.set(SX, 0.71, 0.31); CUR.add(trap);
+  trap.rotation.set(0, Math.PI/2, Math.PI); trap.position.set(SX, AP-BW.d-0.08, 0.31); CUR.add(trap);
 }
-cyl(.02,.10, M.pipe, SX, 0.76, 0.26);
-cyl(.02,.25, M.pipe, SX, 0.81, 0.135, CUR, [Math.PI/2,0,0]);
+cyl(.02,.06, M.pipe, SX, AP-BW.d-0.05, 0.26);
+cyl(.02,.24, M.pipe, SX, AP-BW.d-0.02, 0.14, CUR, [Math.PI/2,0,0]);
 // Spülenschrank-Tür: Scharnier links (Spülmaschinenseite), sonst schlägt sie gegen den Holzschrank
 const sinkDoor = group(); sinkDoor.position.set(1.65+gap, PL+gap, 0.60);
 box(CH.x0-1.65-2*gap, 0.74-2*gap, T, M.front, (CH.x0-1.65)/2, 0.37, -T/2, sinkDoor);
