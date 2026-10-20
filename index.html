@@ -95,6 +95,7 @@
     <input type="range" id="cabPos" min="62" step="1">
     <span id="cabPosOut"></span>
   </label>
+  <div id="cabColors"></div>
   </section>
   <section data-sec="col">
   <h2>Farben</h2>
@@ -900,11 +901,11 @@ const colorRows = [
   {label:'Kühlschrank', cur:0xc6c8ca,
     presets:[['Edelstahl',0xc6c8ca,.65],['Grau',0x8d9094,.3],['Weiß',0xf4f4f2,0],['Schwarz',0x2a2a2a,.3]],
     set:(v, p) => { M.fridge.color.setHex(v); M.fridge.metalness = p ? p[2] : M.fridge.metalness; }},
-  {label:'Schrank Kaminwand', get presets(){ return cabs[cab].colors; }, get cur(){ return cabs[cab].mat.color.getHex(); }, set cur(v){},
+  {label:'Farbe', box:'cabColors', get presets(){ return cabs[cab].colors; }, get cur(){ return cabs[cab].mat.color.getHex(); }, set cur(v){},
     set:v => cabs[cab].mat.color.setHex(v)},
 ];
 function renderColors(){
-  const box = $('colors'); box.innerHTML = '';
+  $('colors').innerHTML = $('cabColors').innerHTML = '';
   for (const r of colorRows){
     const row = document.createElement('div'); row.className = 'crow';
     const name = (r.presets.find(p => p[1] === r.cur) || ['eigene Farbe'])[0];
@@ -924,7 +925,7 @@ function renderColors(){
       inp.onchange = renderColors;
       sw.appendChild(inp);
     }
-    box.appendChild(row);
+    $(r.box || 'colors').appendChild(row);
   }
 }
 showCab(cab);
