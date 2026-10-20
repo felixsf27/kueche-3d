@@ -20,7 +20,30 @@
   .save{width:100%;margin-top:12px;background:var(--accent);border-color:var(--accent);color:#fff}
   .toggle{position:fixed;left:16px;top:16px;display:none}
   .hidden .ui{display:none}.hidden .toggle{display:block}
-  @media (max-width:600px){.ui{top:auto;bottom:16px;width:auto;right:16px;max-height:45vh}}
+  .tabs{display:none}
+  .info{margin:6px 0 0;color:var(--muted);font-size:13px}
+  .slide{display:block;margin-top:10px;font-size:13px;color:var(--muted)}
+  .slide input{width:100%;accent-color:var(--accent)}
+  .crow{margin-top:8px;font-size:13px}
+  .crow b{font-weight:600}.crow span{color:var(--muted)}
+  .sw{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+  .swatch{width:26px;height:26px;padding:0;border-radius:50%;border:2px solid var(--line);box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
+  .swatch.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+  .sw input[type=color]{width:26px;height:26px;padding:0;border:2px dashed var(--muted);border-radius:50%;background:none;cursor:pointer}
+  .sw input[type=color]::-webkit-color-swatch-wrapper{padding:0}
+  .sw input[type=color]::-webkit-color-swatch{border:none;border-radius:50%}
+  /* Handy: unten eine Leiste mit vier Reitern, ein Bereich klappt darüber auf */
+  @media (max-width:600px){
+    .ui{left:0;right:0;top:auto;bottom:0;width:auto;max-width:none;max-height:none;overflow:visible;border-radius:16px 16px 0 0;border-bottom:none;padding:8px 10px calc(8px + env(safe-area-inset-bottom))}
+    .head,#hide{display:none}
+    .tabs{display:flex;gap:6px}
+    .tabs button{flex:1;padding:9px 4px}
+    .ui section{display:none;max-height:34vh;overflow:auto;padding-top:4px}
+    .ui section.active{display:block}
+    .ui h2{margin:8px 0 5px}
+    button{font-size:13px;padding:7px 9px}
+    .save{margin-top:8px}
+  }
 </style>
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
@@ -29,8 +52,17 @@
 <body>
 <canvas id="c"></canvas>
 <div class="ui">
+  <div class="head">
   <h1>Unsere Küche</h1>
   <p>Drehen mit Maus oder Finger, Mausrad zoomt. Die Seite, hinter der du stehst, blendet sich mit allen Schränken aus. Raum 2,63 × 3,15 m, Arbeitsplatte 92 cm.</p>
+  </div>
+  <nav class="tabs">
+    <button data-tab="open">Öffnen</button>
+    <button data-tab="cab">Schrank</button>
+    <button data-tab="col">Farben</button>
+    <button data-tab="view">Ansicht</button>
+  </nav>
+  <section data-sec="open">
   <h2>Oben öffnen</h2>
   <div class="row">
     <button data-t="flaps">Klappen</button>
@@ -50,13 +82,25 @@
     <button data-t="pull">Auszug am Ofen</button>
     <button data-t="tray">Blechschublade</button>
   </div>
+  </section>
+  <section data-sec="cab">
   <h2>Schrank an der Kaminwand</h2>
   <div class="row">
-    <button id="cabPrev" aria-label="Vorheriger Schrank">◀</button>
-    <button id="cabNext" style="flex:1">Nächster Schrank ▶</button>
+    <button id="cabPrev">Vorheriger Schrank</button>
+    <button id="cabNext">Nächster Schrank</button>
     <button data-t="buffet">Öffnen</button>
   </div>
-  <p id="cabInfo" style="margin:6px 0 0"></p>
+  <p id="cabInfo" class="info"></p>
+  <label class="slide">Verschieben
+    <input type="range" id="cabPos" min="62" step="1">
+    <span id="cabPosOut"></span>
+  </label>
+  </section>
+  <section data-sec="col">
+  <h2>Farben</h2>
+  <div id="colors"></div>
+  </section>
+  <section data-sec="view">
   <h2>Möbel</h2>
   <div class="row">
     <button data-t="table">Tisch + Stühle</button>
@@ -71,6 +115,7 @@
   </div>
   <button class="save" id="save">Bild speichern</button>
   <div class="row" style="margin-top:8px"><button id="hide">Menü ausblenden</button></div>
+  </section>
 </div>
 <button class="toggle" id="show">Menü</button>
 
@@ -129,7 +174,12 @@ const M = {
   pane: mat(0xbfd9e6, {roughness:.05, transparent:true, opacity:.35}),
   sill: mat(0xe6dccb, {roughness:.5}),
   pipe: mat(0x9a9a9a, {metalness:.5, roughness:.35}),
+  wallK: mat(0xfbfbfa, {roughness:.95}),                  // Wand hinter Herd + Spüle, Farbe wählbar
+  fridge: mat(0xc6c8ca, {metalness:.65, roughness:.32}),
+  frame: mat(0xf7f2e8, {roughness:.5}),                   // Fensterrahmen cremeweiß
+  marble: mat(0xd8ccb0, {roughness:.35}),
 };
+M.dw = M.front.clone();                                   // Spülmaschinenfront, eigene Farbe möglich
 const edgeMat = new THREE.LineBasicMaterial({color:0x3b3631, transparent:true, opacity:.45});
 
 // Alles wird in die gerade aktive Gruppe gebaut (CUR), damit ganze Seiten ausblendbar sind
@@ -228,33 +278,47 @@ const wallMeshes = [];
 const wall = (...a) => wallMeshes.push(bx(...a));
 
 // ---------- Wände ----------
-CUR = G.back;    wall(-0.12,W+0.12, 0,H, -0.12,0, M.wall);
-CUR = G.stove;   wall(-0.12,0, 0,H, 0,L, M.wall);
+CUR = G.back;    wall(-0.12,W+0.12, 0,H, -0.12,0, M.wallK);
+CUR = G.stove;   wall(-0.12,0, 0,H, 0,L, M.wallK);
 CUR = G.chimney; wall(W,W+0.12, 0,H, 0,L, M.wall);
 CUR = G.shaft;   wall(CH.x0,W, 0,H, 0,CH.z1, M.wall);   // zugemauerter Kamin
 // Steckdose auf der 36-cm-Seite vom Kamin
 box(0.08,0.08,0.012, M.white, 2.45, 1.08, CH.z1+0.006);
 box(0.04,0.04,0.004, mat(0xd8d8d8), 2.45, 1.08, CH.z1+0.014, CUR, false);
 
-// Fensterwand mit Fenster (Heizkörper weggelassen)
+// Fensterwand: Fenster sitzt tief in einer Nische (nach Felix' Foto), Fensterbank aus hellem Marmor
 CUR = G.window;
 const WIN = {x0:1.15, x1:2.30, y0:0.90, y1:2.45};
-wall(-0.12,WIN.x0, 0,H, L,L+0.12, M.wall);
-wall(WIN.x1,W+0.12, 0,H, L,L+0.12, M.wall);
-wall(WIN.x0,WIN.x1, 0,WIN.y0, L,L+0.12, M.wall);
-wall(WIN.x0,WIN.x1, WIN.y1,H, L,L+0.12, M.wall);
+const WT = 0.40, WD = 0.25;   // shortcut: Wanddicke + Nischentiefe nach Foto geschätzt, nachmessen
+wall(-0.12,WIN.x0, 0,H, L,L+WT, M.wall);
+wall(WIN.x1,W+0.12, 0,H, L,L+WT, M.wall);
+wall(WIN.x0,WIN.x1, 0,WIN.y0, L,L+WT, M.wall);
+wall(WIN.x0,WIN.x1, WIN.y1,H, L,L+WT, M.wall);
 {
-  const f = 0.06, zf0 = L+0.03, zf1 = L+0.09, tr = 2.02, mx = (WIN.x0+WIN.x1)/2;
-  bx(WIN.x0,WIN.x1, WIN.y0,WIN.y0+f, zf0,zf1, M.white);
-  bx(WIN.x0,WIN.x1, WIN.y1-f,WIN.y1, zf0,zf1, M.white);
-  bx(WIN.x0,WIN.x0+f, WIN.y0,WIN.y1, zf0,zf1, M.white);
-  bx(WIN.x1-f,WIN.x1, WIN.y0,WIN.y1, zf0,zf1, M.white);
-  bx(WIN.x0,WIN.x1, tr,tr+f, zf0,zf1, M.white);
-  bx(mx-f/2,mx+f/2, WIN.y0,WIN.y1, zf0,zf1, M.white);
-  for (const yy of [1.30,1.66]) { bx(WIN.x0,mx, yy,yy+0.025, zf0+0.01,zf0+0.03, M.white); bx(mx,WIN.x1, yy,yy+0.025, zf0+0.01,zf0+0.03, M.white); }
-  bx(WIN.x0+f,WIN.x1-f, WIN.y0+f,WIN.y1-f, L+0.055,L+0.06, M.pane, CUR, false);
-  bx(mx+0.05,mx+0.08, 1.30,1.36, zf0-0.03,zf0, M.steel, CUR, false);
-  bx(WIN.x0-0.05,WIN.x1+0.05, WIN.y0-0.03,WIN.y0, L-0.18,L+0.03, M.sill);
+  // Blick zum Fenster: links (Kaminseite) der schmale Flügel, rechts der breite mit Griff
+  const fm = M.frame, f = 0.06, s = 0.05, zf0 = L+WD, zf1 = zf0+0.07, zs0 = zf0-0.015, zs1 = zf0+0.04;
+  const tr = 2.02, xs = WIN.x1 - 0.40*(WIN.x1-WIN.x0);
+  bx(WIN.x0,WIN.x1, WIN.y0,WIN.y0+f, zf0,zf1, fm);                 // Blendrahmen
+  bx(WIN.x0,WIN.x1, WIN.y1-f,WIN.y1, zf0,zf1, fm);
+  bx(WIN.x0,WIN.x0+f, WIN.y0,WIN.y1, zf0,zf1, fm);
+  bx(WIN.x1-f,WIN.x1, WIN.y0,WIN.y1, zf0,zf1, fm);
+  bx(WIN.x0+f,WIN.x1-f, tr,tr+0.07, zf0,zf1, fm);                  // Kämpfer zwischen Oberlicht und Flügeln
+  // Flügel: Rahmen + Scheibe, unten mit zwei Sprossen
+  function sash(x0, x1, y0, y1, bars){
+    bx(x0,x1, y0,y0+s, zs0,zs1, fm); bx(x0,x1, y1-s,y1, zs0,zs1, fm);
+    bx(x0,x0+s, y0+s,y1-s, zs0,zs1, fm); bx(x1-s,x1, y0+s,y1-s, zs0,zs1, fm);
+    bx(x0+s,x1-s, y0+s,y1-s, zf0+0.02,zf0+0.025, M.pane, CUR, false);
+    for (let i=1;i<=bars;i++){ const y = y0+s+(y1-y0-2*s)*i/(bars+1); bx(x0+s,x1-s, y-0.0125,y+0.0125, zs0+0.005,zf0+0.015, fm); }
+  }
+  sash(WIN.x0+f, xs, WIN.y0+f, tr, 2);
+  sash(xs, WIN.x1-f, WIN.y0+f, tr, 2);
+  sash(WIN.x0+f, xs, tr+0.07, WIN.y1-f, 0);
+  sash(xs, WIN.x1-f, tr+0.07, WIN.y1-f, 0);
+  const hm = mat(0xb9bbbd, {metalness:.6, roughness:.35});
+  bx(xs-0.035,xs-0.015, 1.40,1.47, zs0-0.02,zs0, hm, CUR, false);   // Griff am breiten Flügel
+  bx(xs-0.035,xs-0.015, 1.33,1.40, zs0-0.035,zs0-0.02, hm, CUR, false);
+  bx(xs-0.06,xs+0.02, WIN.y1-f-0.05,WIN.y1-f-0.03, zs0-0.02,zs0, hm, CUR, false);   // Griff Oberlicht
+  bx(WIN.x0-0.05,WIN.x1+0.05, WIN.y0-0.03,WIN.y0, L-0.04,zf0+0.01, M.marble);       // Fensterbank, 4 cm Überstand
 }
 // Heizkörper mittig unter dem Fenster, etwas schmaler als das Fenster
 {
@@ -324,7 +388,7 @@ for (const [x,dz,r] of [[0.18,-0.15,.08],[0.43,-0.15,.06],[0.18,0.15,.06],[0.43,
 }
 // Kühlschrank: normaler Standkühlschrank, 60 breit, 58 tief, niedriger als die Tür
 const FR = {z0:1.36, z1:1.96, d:0.58, h:1.80};   // 60 cm breit
-bx(0,FR.d, 0,FR.h, FR.z0,FR.z1, M.steel);
+bx(0,FR.d, 0,FR.h, FR.z0,FR.z1, M.fridge);
 bx(FR.d,FR.d+0.002, 1.12,1.13, FR.z0+0.01,FR.z1-0.01, M.grip, CUR, false);
 cyl(.011,.38, M.steel, FR.d+0.03,1.38,FR.z0+0.05);
 cyl(.011,.38, M.steel, FR.d+0.03,0.78,FR.z0+0.05);
@@ -408,7 +472,7 @@ for (const [y0,y1] of [[0.71,0.877],[0.41,0.71],[0.10,0.41]]){
   }
 }
 const dwDoor = group(); dwDoor.position.set(1.35, PL+0.003, 0.60);
-box(0.60-2*gap, 0.74-2*gap, T, M.front, 0, 0.37, -T/2, dwDoor);
+box(0.60-2*gap, 0.74-2*gap, T, M.dw, 0, 0.37, -T/2, dwDoor);
 box(0.54, 0.66, 0.006, M.steel, 0, 0.37, -T-0.003, dwDoor, false);
 
 // Spüle mit Hahnbank hinten: der Wasserhahn steht auf der Spüle, das Becken ist echt vertieft
@@ -503,7 +567,8 @@ box(0.004,0.04,0.04, mat(0xd8d8d8), W-0.014, 0.30, L-1.10, CUR, false);
 // Mehrere Schränke zur Auswahl, immer nur einer sichtbar ("Nächster Schrank").
 // Alle stehen ab 76 cm von der Spülwand, mit dem Rücken an der Kaminwand.
 const cabs = [];
-function cabinet(name, info){ const g = group(G.chimney); CUR = g; cabs.push({name, info, g}); }
+// w: Breite (für das Verschieben), mat + colors: nur Farben, die es den Schrank wirklich gibt
+function cabinet(name, info, w, mat, colors){ const g = group(G.chimney); CUR = g; cabs.push({name, info, w, mat, colors, g}); }
 const buffetDoors = [], buffetDrawers = [];
 const Z0 = 0.76;
 // ---- Bausteine für die Schränke, Front zeigt in den Raum (-x) ----
@@ -550,7 +615,7 @@ function hdrawer(fx, y0,y1, z0,z1, m, knob){
   buffetDrawers.push(g);
 }
 
-cabinet('Holzbuffet', '120 × 195 × 36 cm (B × H × T), nach deinem Foto');
+cabinet('Holzbuffet', '120 × 195 × 36 cm (B × H × T), nach deinem Foto', 1.20, M.pine, [['Kiefer', 0xc98c4f]]);
 // Küchenbuffet aus Holz (nach Foto): 120 breit, 36 tief, bündig mit dem Kamin.
 // Unten links Schublade + zwei Türen, rechts hohe Tür. Oben links offene Nische + zwei Türen, rechts offene Fächer.
 const P = {x0:CH.x0, x1:W, z0:0.76, z1:1.96};
@@ -599,10 +664,11 @@ box(0.012, 0.012, 0.14, M.steel, fx-T-0.012, 0.775, (P.z0+pzB)/2, buffetDrawer);
 buffetDrawers.push(buffetDrawer);
 
 // ---- VASAGLE Buffet (otto.de): 72,8 × 180, Tiefe steht nicht im Screenshot, 40 angenommen ----
-cabinet('VASAGLE Buffet mit Glastüren', '72,8 × 180 × ca. 40 cm (Tiefe geschätzt), otto.de');
 {
-  const z0 = Z0, z1 = Z0+0.728, zm = (z0+z1)/2, d = 0.40, du = 0.30, fx = W-d, fu = W-du, m = M.white;
-  bx(fx+0.03,W, 0,0.06, z0+0.02,z1-0.02, M.white);          // Sockel, etwas zurück
+  const m = mat(0xffffff, {roughness:.5});
+  cabinet('VASAGLE Buffet mit Glastüren', '72,8 × 180 × ca. 40 cm (Tiefe geschätzt), otto.de', 0.728, m, [['Weiß', 0xffffff]]);
+  const z0 = Z0, z1 = Z0+0.728, zm = (z0+z1)/2, d = 0.40, du = 0.30, fx = W-d, fu = W-du;
+  bx(fx+0.03,W, 0,0.06, z0+0.02,z1-0.02, m);                 // Sockel, etwas zurück
   shell(z0,z1, 0.06,0.88, d, m);
   shelf(z0,z1, 0.38, d-0.02, M.inner);
   shelf(z0,z1, 0.70, d, m);
@@ -620,9 +686,10 @@ cabinet('VASAGLE Buffet mit Glastüren', '72,8 × 180 × ca. 40 cm (Tiefe gesch�
 
 // ---- Yaheetech ARE34 (home24.de, 149,99 €): Maße aus der Maßzeichnung ----
 // 80 × 183 × 37. Unterteil 81,7 hoch (Korpus 75 breit, Platte 80), Nische 49,5, oben 24er Fächer
-cabinet('Yaheetech Buffetschrank ARE34', '80 × 183 × 37 cm, home24.de, 149,99 €');
 {
-  const z0 = Z0+0.025, z1 = Z0+0.775, zm = (z0+z1)/2, d = 0.37, du = 0.25, fx = W-d, fu = W-du, m = M.white;
+  const m = mat(0xffffff, {roughness:.5});
+  cabinet('Yaheetech Buffetschrank ARE34', '80 × 183 × 37 cm, home24.de, 149,99 €', 0.80, m, [['Weiß', 0xffffff]]);
+  const z0 = Z0+0.025, z1 = Z0+0.775, zm = (z0+z1)/2, d = 0.37, du = 0.25, fx = W-d, fu = W-du;
   const oakTop = mat(0xc9a06a, {roughness:.5});
   shell(z0,z1, 0,0.79, d, m);
   bx(fx+0.02,W, 0,0.04, z0+0.016,z1-0.016, m);               // Blende unten
@@ -641,9 +708,10 @@ cabinet('Yaheetech Buffetschrank ARE34', '80 × 183 × 37 cm, home24.de, 149,99 
 
 // ---- Hzuaneri PT10303XEU (amazon.de): 100 × 180 × 40 ----
 // Unten: offenes Fach, Tür, drei Schubladen. Oben: Nische mit LED, drei Glastüren
-cabinet('Hzuaneri Buffetschrank mit LED', '100 × 180 × 40 cm, amazon.de');
 {
-  const z0 = Z0, z1 = Z0+1.00, d = 0.40, du = 0.30, fx = W-d, fu = W-du, m = M.white;
+  const m = mat(0xffffff, {roughness:.5});
+  cabinet('Hzuaneri Buffetschrank mit LED', '100 × 180 × 40 cm, amazon.de', 1.00, m, [['Eiche-Weiß', 0xffffff], ['Schwarz', 0x232323]]);
+  const z0 = Z0, z1 = Z0+1.00, d = 0.40, du = 0.30, fx = W-d, fu = W-du;
   const oakTop = mat(0xc9a06a, {roughness:.5});
   const za = z0+0.30, zb = z0+0.65;
   shell(z0,z1, 0.05,0.84, d, m);
@@ -668,10 +736,10 @@ cabinet('Hzuaneri Buffetschrank mit LED', '100 × 180 × 40 cm, amazon.de');
 
 // ---- Bogenschrank aus Holz (amazon.de) ----
 // shortcut: Maße stehen nicht im Screenshot, 75 × 183 × 40 aus den Proportionen geschätzt. Echte Maße eintragen, sobald bekannt
-cabinet('Bogenschrank Holz', 'ca. 75 × 183 × 40 cm (Maße geschätzt), amazon.de');
 {
-  const z0 = Z0, z1 = Z0+0.75, zm = (z0+z1)/2, d = 0.40, du = 0.30, fx = W-d, fu = W-du;
   const m = mat(0xb48b5e, {roughness:.6}), dark = mat(0x7a5a3c, {roughness:.6});
+  cabinet('Bogenschrank Holz', 'ca. 75 × 183 × 40 cm (Maße geschätzt), amazon.de', 0.75, m, [['Holz', 0xb48b5e]]);
+  const z0 = Z0, z1 = Z0+0.75, zm = (z0+z1)/2, d = 0.40, du = 0.30, fx = W-d, fu = W-du;
   const brass = mat(0xc9a24a, {metalness:.7, roughness:.3}), rattan = mat(0xdcbc82, {roughness:.85});
   for (const z of [z0+0.03, z1-0.03]) for (const x of [fx+0.03, W-0.03]) bx(x-0.02,x+0.02, 0,0.08, z-0.02,z+0.02, m);
   shell(z0,z1, 0.08,0.80, d, m);
@@ -792,15 +860,79 @@ document.querySelectorAll('[data-t]').forEach(b => {
   b.onclick = () => { const k = b.dataset.t; target[k] = target[k] ? 0 : 1; b.classList.toggle('on', target[k]===1); };
 });
 document.querySelectorAll('[data-v]').forEach(b => b.onclick = () => setView(b.dataset.v));
+// ---------- Schrank an der Kaminwand: wechseln + verschieben ----------
+const $ = id => document.getElementById(id);
+const cm = v => Math.round(v*100);
 let cab = Math.min(cabs.length-1, Math.max(0, Number(q.get('schrank')) || 0));
+let cabZ = Z0;   // Anfang des Schranks, gemessen von der Spülwand
+function placeCab(){
+  const c = cabs[cab], max = L - c.w;
+  cabZ = Math.min(Math.max(cabZ, CH.z1), max);
+  cabs.forEach(o => o.g.position.z = cabZ - Z0);
+  $('cabPos').max = cm(max); $('cabPos').value = cm(cabZ);
+  $('cabPosOut').textContent = `${cm(cabZ - CH.z1)} cm Platz zum Kamin, ${cm(L - cabZ - c.w)} cm zur Fensterwand`;
+}
 function showCab(i){
   cab = (i + cabs.length) % cabs.length;
   cabs.forEach((c, k) => c.g.visible = k === cab);
-  document.getElementById('cabInfo').textContent = `${cab+1}/${cabs.length}: ${cabs[cab].name}, ${cabs[cab].info}`;
+  $('cabInfo').textContent = `${cab+1}/${cabs.length}: ${cabs[cab].name}, ${cabs[cab].info}`;
+  placeCab();
+  renderColors();
 }
-document.getElementById('cabNext').onclick = () => showCab(cab+1);
-document.getElementById('cabPrev').onclick = () => showCab(cab-1);
+$('cabNext').onclick = () => showCab(cab+1);
+$('cabPrev').onclick = () => showCab(cab-1);
+$('cabPos').oninput = e => { cabZ = e.target.value/100; placeCab(); };
+
+// ---------- Farben ----------
+const hex = n => '#' + n.toString(16).padStart(6, '0');
+const FRONTS = [['Sand',0xc4baad],['Weiß',0xf2f0ec],['Kaschmir',0xd8cbb8],['Greige',0xa89f94],['Salbei',0xa7b39c],['Dunkelgrün',0x3f5248],
+  ['Blaugrau',0x6f7f8c],['Navy',0x2d3a4f],['Terrakotta',0xb5694a],['Anthrazit',0x3d3d3d],['Schwarz',0x1f1f1f]];
+const colorRows = [
+  {label:'Fronten', presets:FRONTS, custom:true, cur:0xc4baad,
+    set:v => { M.front.color.setHex(v); M.body.color.setHex(v).multiplyScalar(0.94); M.dw.color.setHex(v); colorRows[1].cur = v; }},
+  {label:'Spülmaschine', presets:FRONTS, custom:true, cur:0xc4baad, set:v => M.dw.color.setHex(v)},
+  {label:'Arbeitsplatte', custom:true, cur:0x4a4643, set:v => M.top.color.setHex(v),
+    presets:[['Steinoptik dunkel',0x4a4643],['Schwarz',0x1c1c1c],['Beton',0x9a9894],['Weiß',0xeeece8],['Eiche hell',0xc9a06a],['Nussbaum',0x6e4a32]]},
+  {label:'Wand Herd + Spüle', custom:true, cur:0xfbfbfa, set:v => M.wallK.color.setHex(v),
+    presets:[['Weiß',0xfbfbfa],['Creme',0xf1e8d8],['Hellgrau',0xd9d9d6],['Salbei',0xc5cdb9],['Hellblau',0xcfdbe3],['Altrosa',0xe3c4bc],['Terrakotta',0xc9825f],['Orange wie bisher',0xe39a4f]]},
+  {label:'Kühlschrank', cur:0xc6c8ca,
+    presets:[['Edelstahl',0xc6c8ca,.65],['Grau',0x8d9094,.3],['Weiß',0xf4f4f2,0],['Schwarz',0x2a2a2a,.3]],
+    set:(v, p) => { M.fridge.color.setHex(v); M.fridge.metalness = p ? p[2] : M.fridge.metalness; }},
+  {label:'Schrank Kaminwand', get presets(){ return cabs[cab].colors; }, get cur(){ return cabs[cab].mat.color.getHex(); }, set cur(v){},
+    set:v => cabs[cab].mat.color.setHex(v)},
+];
+function renderColors(){
+  const box = $('colors'); box.innerHTML = '';
+  for (const r of colorRows){
+    const row = document.createElement('div'); row.className = 'crow';
+    const name = (r.presets.find(p => p[1] === r.cur) || ['eigene Farbe'])[0];
+    row.innerHTML = `<b>${r.label}</b> <span>${name}</span><div class="sw"></div>`;
+    const sw = row.querySelector('.sw');
+    for (const p of r.presets){
+      const b = document.createElement('button');
+      b.className = 'swatch' + (p[1] === r.cur ? ' on' : '');
+      b.style.background = hex(p[1]); b.title = p[0]; b.setAttribute('aria-label', `${r.label}: ${p[0]}`);
+      b.onclick = () => { r.set(p[1], p); r.cur = p[1]; renderColors(); };
+      sw.appendChild(b);
+    }
+    if (r.custom){
+      const inp = document.createElement('input');
+      inp.type = 'color'; inp.value = hex(r.cur); inp.title = 'Eigene Farbe'; inp.setAttribute('aria-label', `${r.label}: eigene Farbe`);
+      inp.oninput = () => { const v = parseInt(inp.value.slice(1), 16); r.set(v); r.cur = v; row.querySelector('span').textContent = 'eigene Farbe'; };
+      inp.onchange = renderColors;
+      sw.appendChild(inp);
+    }
+    box.appendChild(row);
+  }
+}
 showCab(cab);
+
+// Handy: Reiter unten, ein Tipp öffnet den Bereich, noch ein Tipp klappt ihn zu
+document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => {
+  const open = !b.classList.contains('on');
+  document.querySelectorAll('[data-tab]').forEach(o => o.classList.toggle('on', open && o === b));
+  document.querySelectorAll('[data-sec]').forEach(s => s.classList.toggle('active', open && s.dataset.sec === b.dataset.tab));
+});
 document.getElementById('save').onclick = () => {
   renderer.render(scene, camera);
   const a = document.createElement('a');
@@ -814,7 +946,8 @@ document.getElementById('show').onclick = () => document.body.classList.remove('
 function resize(){
   const w = innerWidth, h = innerHeight;
   renderer.setSize(w, h, false);
-  camera.aspect = w/h; camera.updateProjectionMatrix();
+  camera.aspect = w/h; camera.fov = w < h ? 72 : 50;   // Handy hochkant: weiter Blick
+  camera.updateProjectionMatrix();
 }
 addEventListener('resize', resize); resize();
 
