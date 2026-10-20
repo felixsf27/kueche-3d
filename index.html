@@ -278,8 +278,8 @@ const wallMeshes = [];
 const wall = (...a) => wallMeshes.push(bx(...a));
 
 // ---------- Wände ----------
-CUR = G.back;    wall(-0.12,W+0.12, 0,H, -0.12,0, M.wallK);
-CUR = G.stove;   wall(-0.12,0, 0,H, 0,L, M.wallK);
+CUR = G.back;    wall(-0.12,W+0.12, 0,H, -0.12,0, M.wall);
+CUR = G.stove;   wall(-0.12,0, 0,H, 0,L, M.wall);
 CUR = G.chimney; wall(W,W+0.12, 0,H, 0,L, M.wall);
 CUR = G.shaft;   wall(CH.x0,W, 0,H, 0,CH.z1, M.wall);   // zugemauerter Kamin
 // Steckdose auf der 36-cm-Seite vom Kamin
@@ -378,6 +378,8 @@ const pull = group();
   for (const y of [0.38, 0.62]) bx(0.08,0.58, y,y+0.012, w0,w1, M.inner, pull);
   bx(0.06,0.08, 0.12,0.80, w0,w1, M.inner, pull);                  // hintere Stütze, Seiten offen
 }
+// Rückwand-Streifen zwischen Arbeitsplatte und Oberschränken, Farbe wählbar
+bx(0,0.004, AP,Y0, 0,PU.z1, M.wallK, CUR, false);
 // Arbeitsplatte + Kochfeld
 bx(0,0.60, BT,AP, 0,PU.z1, M.top);
 const HZ = (OV.z0+OV.z1)/2;
@@ -427,6 +429,7 @@ CUR.add(hobLight, hobLight.target);
 
 // ---------- Spülwand ----------
 CUR = G.back;
+bx(0,CH.x0, AP,Y0, 0,0.004, M.wallK, CUR, false);   // Rückwand-Streifen hinter der Spüle
 bx(0.56,CH.x0, 0,PL, 0,0.56, M.plinth);
 bx(0.60,CH.x0-0.018, PL,BT, 0,0.02, M.inner, CUR, false);
 bx(0.60,CH.x0-0.018, PL,PL+0.018, 0.02,0.58, M.inner, CUR, false);
@@ -892,7 +895,7 @@ const colorRows = [
   {label:'Spülmaschine', presets:FRONTS, custom:true, cur:0xc4baad, set:v => M.dw.color.setHex(v)},
   {label:'Arbeitsplatte', custom:true, cur:0x4a4643, set:v => M.top.color.setHex(v),
     presets:[['Steinoptik dunkel',0x4a4643],['Schwarz',0x1c1c1c],['Beton',0x9a9894],['Weiß',0xeeece8],['Eiche hell',0xc9a06a],['Nussbaum',0x6e4a32]]},
-  {label:'Wand Herd + Spüle', custom:true, cur:0xfbfbfa, set:v => M.wallK.color.setHex(v),
+  {label:'Rückwand Herd + Spüle', custom:true, cur:0xfbfbfa, set:v => M.wallK.color.setHex(v),
     presets:[['Weiß',0xfbfbfa],['Creme',0xf1e8d8],['Hellgrau',0xd9d9d6],['Salbei',0xc5cdb9],['Hellblau',0xcfdbe3],['Altrosa',0xe3c4bc],['Terrakotta',0xc9825f],['Orange wie bisher',0xe39a4f]]},
   {label:'Kühlschrank', cur:0xc6c8ca,
     presets:[['Edelstahl',0xc6c8ca,.65],['Grau',0x8d9094,.3],['Weiß',0xf4f4f2,0],['Schwarz',0x2a2a2a,.3]],
