@@ -49,8 +49,14 @@
     <button data-t="sink">Spülenschrank</button>
     <button data-t="pull">Auszug am Ofen</button>
     <button data-t="tray">Blechschublade</button>
-    <button data-t="buffet">Buffet</button>
   </div>
+  <h2>Schrank an der Kaminwand</h2>
+  <div class="row">
+    <button id="cabPrev" aria-label="Vorheriger Schrank">◀</button>
+    <button id="cabNext" style="flex:1">Nächster Schrank ▶</button>
+    <button data-t="buffet">Öffnen</button>
+  </div>
+  <p id="cabInfo" style="margin:6px 0 0"></p>
   <h2>Möbel</h2>
   <div class="row">
     <button data-t="table">Tisch + Stühle</button>
@@ -491,9 +497,60 @@ sphere(.014, M.steel, 0.012, (Y1-Y0)*0.18, -0.225, cornerSide);
 
 // ---------- Kaminwand: Holzschrank, max. 36 cm tief, bündig mit dem Kamin ----------
 CUR = G.chimney;
-// Steckdose beim Tisch
-box(0.012,0.08,0.08, M.white, W-0.006, 0.30, 2.02);
-box(0.004,0.04,0.04, mat(0xd8d8d8), W-0.014, 0.30, 2.02, CUR, false);
+// Steckdose beim Tisch, 110 cm von der Fensterwand
+box(0.012,0.08,0.08, M.white, W-0.006, 0.30, L-1.10);
+box(0.004,0.04,0.04, mat(0xd8d8d8), W-0.014, 0.30, L-1.10, CUR, false);
+// Mehrere Schränke zur Auswahl, immer nur einer sichtbar ("Nächster Schrank").
+// Alle stehen ab 76 cm von der Spülwand, mit dem Rücken an der Kaminwand.
+const cabs = [];
+function cabinet(name, info){ const g = group(G.chimney); CUR = g; cabs.push({name, info, g}); }
+const buffetDoors = [], buffetDrawers = [];
+const Z0 = 0.76;
+// ---- Bausteine für die Schränke, Front zeigt in den Raum (-x) ----
+function shell(z0,z1, y0,y1, d, m, th=0.016){
+  const x0 = W-d;
+  bx(x0,W, y0,y1, z0,z0+th, m);
+  bx(x0,W, y0,y1, z1-th,z1, m);
+  bx(W-th,W, y0+th,y1-th, z0+th,z1-th, m);
+  bx(x0,W-th, y0,y0+th, z0+th,z1-th, m);
+  bx(x0,W-th, y1-th,y1, z0+th,z1-th, m);
+}
+const shelf = (z0,z1, y, d, m, th=0.016) => bx(W-d,W-th, y,y+th, z0+th,z1-th, m);
+const divider = (z, y0,y1, d, m, th=0.016) => bx(W-d,W-th, y0,y1, z-th/2,z+th/2, m);
+// Tür mit Scharnier bei hz, geht Richtung oz auf. glass: Rahmen + Scheibe, grid: Sprossen
+function hdoor(hz, oz, y0, y1, fx, m, {glass=false, grid=false, hy=null, knob=null}={}){
+  const g = group(); g.position.set(fx, y0, hz);
+  const dir = Math.sign(oz-hz), w = Math.abs(oz-hz)-2*gap, h = y1-y0-2*gap, zc = dir*(w/2+gap), yc = (y1-y0)/2;
+  if (glass){
+    const f = Math.min(0.045, w*0.15);
+    box(T,h,f, m, -T/2,yc, dir*(gap+f/2), g);
+    box(T,h,f, m, -T/2,yc, dir*(gap+w-f/2), g);
+    box(T,f,w-2*f, m, -T/2,yc-h/2+f/2, zc, g);
+    box(T,f,w-2*f, m, -T/2,yc+h/2-f/2, zc, g);
+    box(0.004,h-2*f,w-2*f, M.pane, -T/2,yc, zc, g, false);
+    if (grid){
+      box(0.012,h-2*f,0.014, m, -T/2,yc, zc, g);
+      for (const k of [-1,1]) box(0.012,0.014,w-2*f, m, -T/2,yc+k*(h-2*f)/6, zc, g);
+    }
+  } else box(T,h,w, m, -T/2,yc, zc, g);
+  if (hy !== null){
+    if (knob) sphere(.013, knob, -T-0.01, hy-y0, dir*(w-0.04), g);
+    else box(0.012,0.13,0.012, M.black, -T-0.012, hy-y0, dir*(w-0.035), g);
+  }
+  buffetDoors.push({g, dir});
+}
+function hdrawer(fx, y0,y1, z0,z1, m, knob){
+  const g = group();
+  bx(fx-T,fx, y0+gap,y1-gap, z0+gap,z1-gap, m, g);
+  bx(fx,W-0.04, y0+0.02,y0+0.03, z0+0.03,z1-0.03, M.inner, g);
+  bx(fx,W-0.04, y0+0.03,y1-0.03, z0+0.03,z0+0.045, M.inner, g);
+  bx(fx,W-0.04, y0+0.03,y1-0.03, z1-0.045,z1-0.03, M.inner, g);
+  if (knob) sphere(.013, knob, fx-T-0.01, (y0+y1)/2, (z0+z1)/2, g);
+  else box(0.012,0.012,0.13, M.black, fx-T-0.012, (y0+y1)/2, (z0+z1)/2, g);
+  buffetDrawers.push(g);
+}
+
+cabinet('Holzbuffet', '120 × 195 × 36 cm (B × H × T), nach deinem Foto');
 // Küchenbuffet aus Holz (nach Foto): 120 breit, 36 tief, bündig mit dem Kamin.
 // Unten links Schublade + zwei Türen, rechts hohe Tür. Oben links offene Nische + zwei Türen, rechts offene Fächer.
 const P = {x0:CH.x0, x1:W, z0:0.76, z1:1.96};
@@ -521,7 +578,6 @@ bx(ux,P.x1-pw, 1.27,1.27+pw, P.z0+pw,pzB-pw/2, M.pine);              // über de
 bx(ux+0.02,P.x1-pw, 1.62,1.62+pw, P.z0+pw,pzB-pw/2, M.pine);
 for (const y of [1.30, 1.62]) bx(ux,P.x1-pw, y,y+pw, pzB+pw/2,P.z1-pw, oak);   // offene Fächer rechts
 
-const buffetDoors = [];
 function bdoor(hz, oz, y0, y1, xf, hy){
   const g = group(); g.position.set(xf, y0, hz);
   const dir = Math.sign(oz-hz), w = Math.abs(oz-hz)-2*gap;
@@ -540,6 +596,103 @@ bx(fx,P.x1-0.04, 0.71,0.72, P.z0+0.03,pzB-0.03, M.pine, buffetDrawer);
 bx(fx,P.x1-0.04, 0.72,0.83, P.z0+0.03,P.z0+0.045, M.pine, buffetDrawer);
 bx(fx,P.x1-0.04, 0.72,0.83, pzB-0.045,pzB-0.03, M.pine, buffetDrawer);
 box(0.012, 0.012, 0.14, M.steel, fx-T-0.012, 0.775, (P.z0+pzB)/2, buffetDrawer);
+buffetDrawers.push(buffetDrawer);
+
+// ---- VASAGLE Buffet (otto.de): 72,8 × 180, Tiefe steht nicht im Screenshot, 40 angenommen ----
+cabinet('VASAGLE Buffet mit Glastüren', '72,8 × 180 × ca. 40 cm (Tiefe geschätzt), otto.de');
+{
+  const z0 = Z0, z1 = Z0+0.728, zm = (z0+z1)/2, d = 0.40, du = 0.30, fx = W-d, fu = W-du, m = M.white;
+  bx(fx+0.03,W, 0,0.06, z0+0.02,z1-0.02, M.white);          // Sockel, etwas zurück
+  shell(z0,z1, 0.06,0.88, d, m);
+  shelf(z0,z1, 0.38, d-0.02, M.inner);
+  shelf(z0,z1, 0.70, d, m);
+  hdoor(z0, zm, 0.077,0.70, fx, m, {hy:0.58});
+  hdoor(z1, zm, 0.077,0.70, fx, m, {hy:0.58});
+  hdrawer(fx, 0.716,0.864, z0+0.016,z1-0.016, m);
+  shell(z0,z1, 0.88,1.80, du, m);                             // Aufsatz: Mikrowellen-Nische, oben drei Fächer
+  shelf(z0,z1, 1.30, du, m);
+  const za = z0+0.728/3, zb = z0+0.728*2/3;
+  divider(za, 1.316,1.784, du, m); divider(zb, 1.316,1.784, du, m);
+  shelf(za,zb, 1.55, du-0.01, m);
+  hdoor(z0, za, 1.316,1.784, fu, m, {glass:true, grid:true, hy:1.55});
+  hdoor(z1, zb, 1.316,1.784, fu, m, {glass:true, grid:true, hy:1.55});
+}
+
+// ---- Yaheetech ARE34 (home24.de, 149,99 €): Maße aus der Maßzeichnung ----
+// 80 × 183 × 37. Unterteil 81,7 hoch (Korpus 75 breit, Platte 80), Nische 49,5, oben 24er Fächer
+cabinet('Yaheetech Buffetschrank ARE34', '80 × 183 × 37 cm, home24.de, 149,99 €');
+{
+  const z0 = Z0+0.025, z1 = Z0+0.775, zm = (z0+z1)/2, d = 0.37, du = 0.25, fx = W-d, fu = W-du, m = M.white;
+  const oakTop = mat(0xc9a06a, {roughness:.5});
+  shell(z0,z1, 0,0.79, d, m);
+  bx(fx+0.02,W, 0,0.04, z0+0.016,z1-0.016, m);               // Blende unten
+  shelf(z0,z1, 0.40, d-0.02, M.inner);
+  hdoor(z0, zm, 0.045,0.785, fx, m, {glass:true, grid:true, hy:0.45});
+  hdoor(z1, zm, 0.045,0.785, fx, m, {glass:true, grid:true, hy:0.45});
+  bx(fx-0.01,W, 0.79,0.817, Z0,Z0+0.80, oakTop);              // Holzplatte 80 breit
+  shell(z0,z1, 0.817,1.81, du, m);
+  shelf(z0,z1, 1.31, du, m);
+  divider(zm, 1.326,1.794, du, m);
+  shelf(zm,z1, 1.56, du-0.01, m);
+  shelf(z0,zm, 1.56, du-0.01, M.inner);
+  hdoor(z0, zm, 1.326,1.794, fu, m, {glass:true, grid:true, hy:1.47});
+  bx(fu-0.01,W, 1.81,1.83, Z0,Z0+0.80, oakTop);
+}
+
+// ---- Hzuaneri PT10303XEU (amazon.de): 100 × 180 × 40 ----
+// Unten: offenes Fach, Tür, drei Schubladen. Oben: Nische mit LED, drei Glastüren
+cabinet('Hzuaneri Buffetschrank mit LED', '100 × 180 × 40 cm, amazon.de');
+{
+  const z0 = Z0, z1 = Z0+1.00, d = 0.40, du = 0.30, fx = W-d, fu = W-du, m = M.white;
+  const oakTop = mat(0xc9a06a, {roughness:.5});
+  const za = z0+0.30, zb = z0+0.65;
+  shell(z0,z1, 0.05,0.84, d, m);
+  bx(fx+0.02,W, 0,0.05, z0+0.02,z1-0.02, m);
+  divider(za, 0.066,0.824, d, m); divider(zb, 0.066,0.824, d, m);
+  shelf(z0,za, 0.45, d, m);
+  hdoor(zb, za, 0.066,0.824, fx, m, {hy:0.60});
+  const dh = (0.824-0.066)/3;
+  for (let i=0;i<3;i++) hdrawer(fx, 0.066+i*dh, 0.066+(i+1)*dh, zb+0.008, z1-0.016, m);
+  bx(fx-0.01,W, 0.84,0.87, z0,z1, oakTop);
+  shell(z0,z1, 0.87,1.78, du, m);
+  shelf(z0,z1, 1.20, du, m);
+  const led = bx(fu+0.03,fu+0.05, 1.194,1.20, z0+0.04,z1-0.04, ledMat, CUR, false); led.castShadow = false;
+  const zc = z0+1/3, zd = z0+2/3;
+  divider(zc, 1.216,1.764, du, m); divider(zd, 1.216,1.764, du, m);
+  shelf(z0,z1, 1.49, du-0.02, M.inner);
+  hdoor(z0, zc, 1.216,1.764, fu, m, {glass:true, hy:1.40});
+  hdoor(zd, zc, 1.216,1.764, fu, m, {glass:true, hy:1.40});
+  hdoor(z1, zd, 1.216,1.764, fu, m, {glass:true, hy:1.40});
+  bx(fu-0.01,W, 1.78,1.80, z0,z1, oakTop);
+}
+
+// ---- Bogenschrank aus Holz (amazon.de) ----
+// shortcut: Maße stehen nicht im Screenshot, 75 × 183 × 40 aus den Proportionen geschätzt. Echte Maße eintragen, sobald bekannt
+cabinet('Bogenschrank Holz', 'ca. 75 × 183 × 40 cm (Maße geschätzt), amazon.de');
+{
+  const z0 = Z0, z1 = Z0+0.75, zm = (z0+z1)/2, d = 0.40, du = 0.30, fx = W-d, fu = W-du;
+  const m = mat(0xb48b5e, {roughness:.6}), dark = mat(0x7a5a3c, {roughness:.6});
+  const brass = mat(0xc9a24a, {metalness:.7, roughness:.3}), rattan = mat(0xdcbc82, {roughness:.85});
+  for (const z of [z0+0.03, z1-0.03]) for (const x of [fx+0.03, W-0.03]) bx(x-0.02,x+0.02, 0,0.08, z-0.02,z+0.02, m);
+  shell(z0,z1, 0.08,0.80, d, m);
+  shelf(z0,z1, 0.30, d, m);
+  shelf(z0,z1, 0.55, d-0.02, M.inner);
+  hdrawer(fx, 0.096,0.30, z0+0.016,z1-0.016, rattan, brass);
+  hdoor(z0, zm, 0.316,0.784, fx, m, {glass:true, hy:0.62, knob:brass});
+  hdoor(z1, zm, 0.316,0.784, fx, m, {glass:true, hy:0.62, knob:brass});
+  bx(fx-0.01,W, 0.80,0.83, z0,z1, dark);
+  // Aufsatz: Nische, darüber zwei Glastüren, oben ein Bogen
+  const r = (z1-z0)/2, ya = 1.83-r;
+  shell(z0,z1, 0.83,ya, du, m);
+  shelf(z0,z1, 1.16, du, m);
+  const nled = bx(fu+0.03,fu+0.05, 1.154,1.16, z0+0.04,z1-0.04, ledMat, CUR, false); nled.castShadow = false;
+  hdoor(z0, zm, 1.176,ya-0.016, fu, m, {glass:true, hy:1.22, knob:brass});
+  hdoor(z1, zm, 1.176,ya-0.016, fu, m, {glass:true, hy:1.22, knob:brass});
+  const arch = new THREE.Mesh(new THREE.CylinderGeometry(r, r, du, 40, 1, false, 0, Math.PI), m);
+  arch.rotation.z = Math.PI/2; arch.position.set(W-du/2, ya, zm); arch.castShadow = true; CUR.add(arch);
+  const pane = new THREE.Mesh(new THREE.CircleGeometry(r-0.04, 40, 0, Math.PI), M.pane);
+  pane.rotation.y = -Math.PI/2; pane.position.set(fu-0.002, ya, zm); CUR.add(pane);
+}
 CUR = scene;
 
 // ---------- Tisch mit zwei Stühlen unter dem Fenster (wie im Video), ausblendbar ----------
@@ -600,7 +753,7 @@ function apply(){
   tableGroup.visible = state.table > 0.5;
   tray.position.x = state.tray*0.40;
   buffetDoors.forEach(d => d.g.rotation.y = -d.dir*state.buffet*100*deg);
-  buffetDrawer.position.x = -state.buffet*0.25;
+  buffetDrawers.forEach(g => g.position.x = -state.buffet*0.25);
   ledLights.forEach(l => l.intensity = state.led*2.2);
   ledMat.emissiveIntensity = state.led;
 }
@@ -639,6 +792,15 @@ document.querySelectorAll('[data-t]').forEach(b => {
   b.onclick = () => { const k = b.dataset.t; target[k] = target[k] ? 0 : 1; b.classList.toggle('on', target[k]===1); };
 });
 document.querySelectorAll('[data-v]').forEach(b => b.onclick = () => setView(b.dataset.v));
+let cab = Math.min(cabs.length-1, Math.max(0, Number(q.get('schrank')) || 0));
+function showCab(i){
+  cab = (i + cabs.length) % cabs.length;
+  cabs.forEach((c, k) => c.g.visible = k === cab);
+  document.getElementById('cabInfo').textContent = `${cab+1}/${cabs.length}: ${cabs[cab].name}, ${cabs[cab].info}`;
+}
+document.getElementById('cabNext').onclick = () => showCab(cab+1);
+document.getElementById('cabPrev').onclick = () => showCab(cab-1);
+showCab(cab);
 document.getElementById('save').onclick = () => {
   renderer.render(scene, camera);
   const a = document.createElement('a');
