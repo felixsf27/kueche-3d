@@ -20,7 +20,11 @@
   .save{width:100%;margin-top:12px;background:var(--accent);border-color:var(--accent);color:#fff}
   .toggle{position:fixed;left:16px;top:16px;display:none}
   .hidden .ui{display:none}.hidden .toggle{display:block}
-  .tabs{display:none}
+  .tabs{display:flex;gap:6px;margin-top:4px}
+  .tabs button{flex:1;padding:8px 4px}
+  /* Bereiche sind zu, bis man oben einen Reiter antippt */
+  .ui section{display:none}
+  .ui section.active{display:block}
   .info{margin:6px 0 0;color:var(--muted);font-size:13px}
   .slide{display:block;margin-top:10px;font-size:13px;color:var(--muted)}
   .slide input{width:100%;accent-color:var(--accent)}
@@ -36,10 +40,7 @@
   @media (max-width:600px){
     .ui{left:0;right:0;top:auto;bottom:0;width:auto;max-width:none;max-height:none;overflow:visible;border-radius:16px 16px 0 0;border-bottom:none;padding:8px 10px calc(8px + env(safe-area-inset-bottom))}
     .head,#hide{display:none}
-    .tabs{display:flex;gap:6px}
-    .tabs button{flex:1;padding:9px 4px}
-    .ui section{display:none;max-height:34vh;overflow:auto;padding-top:4px}
-    .ui section.active{display:block}
+    .ui section{max-height:34vh;overflow:auto;padding-top:4px}
     .ui h2{margin:8px 0 5px}
     button{font-size:13px;padding:7px 9px}
     .save{margin-top:8px}
@@ -86,7 +87,6 @@
   <section data-sec="cab">
   <h2>Schrank an der Kaminwand</h2>
   <div class="row">
-    <button id="cabPrev">Vorheriger Schrank</button>
     <button id="cabNext">Nächster Schrank</button>
     <button data-t="buffet">Öffnen</button>
   </div>
@@ -880,7 +880,6 @@ function showCab(i){
   renderColors();
 }
 $('cabNext').onclick = () => showCab(cab+1);
-$('cabPrev').onclick = () => showCab(cab-1);
 $('cabPos').oninput = e => { cabZ = e.target.value/100; placeCab(); };
 
 // ---------- Farben ----------
