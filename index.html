@@ -556,19 +556,23 @@ bx(BW.x1,BW.x1+0.01, AP-BW.d,AP, BW.z0,BW.z1, sinkMat);
 bx(BW.x0-0.01,BW.x1+0.01, AP-BW.d,AP, BW.z0-0.01,BW.z0, sinkMat);
 bx(BW.x0-0.01,BW.x1+0.01, AP-BW.d,AP, BW.z1,BW.z1+0.01, sinkMat);
 cyl(.035,.004, M.steel, SX,AP-BW.d+0.012,0.36);
-// Wasserhahn: niedriger Bogen, als Rohr modelliert
+// Wasserhahn nach Felix' Vorbild (Blanco Mila): runder Körper, L-Auslauf mit ausziehbarer Brause, Hebel seitlich.
+// Maße laut Händler ca. 30 cm hoch, 21 cm Ausladung
 {
-  const hz = 0.085, y0 = AP+0.006;
-  const path = new THREE.CurvePath();
-  path.add(new THREE.LineCurve3(new THREE.Vector3(SX,y0+0.03,hz), new THREE.Vector3(SX,y0+0.17,hz)));
-  path.add(new THREE.CubicBezierCurve3(new THREE.Vector3(SX,y0+0.17,hz), new THREE.Vector3(SX,y0+0.29,hz), new THREE.Vector3(SX,y0+0.29,hz+0.17), new THREE.Vector3(SX,y0+0.17,hz+0.17)));
-  path.add(new THREE.LineCurve3(new THREE.Vector3(SX,y0+0.17,hz+0.17), new THREE.Vector3(SX,y0+0.13,hz+0.17)));
-  const tube = new THREE.Mesh(new THREE.TubeGeometry(path, 64, 0.011, 16, false), M.black);
-  tube.castShadow = true; CUR.add(tube);
-  cyl(.026,.03, M.black, SX,y0+0.015,hz);
-  cyl(.013,.015, M.black, SX,y0+0.125,hz+0.17);                     // Strahlregler
-  cyl(.015,.04, M.black, SX+0.03,y0+0.07,hz, CUR, [0,0,Math.PI/2]);  // Hebel seitlich
-  bx(SX+0.045,SX+0.055, y0+0.07,y0+0.14, hz-0.006,hz+0.006, M.black, CUR, false);
+  const hz = 0.085, y0 = AP+0.006, top = y0+0.28, rb = 0.03, reach = 0.208, r = 0.017;
+  const flat = [Math.PI/2,0,0];                                          // Zylinder waagerecht Richtung Becken
+  cyl(.028,.012, M.black, SX,y0+0.006,hz);                              // Rosette
+  cyl(.024,.13, M.black, SX,y0+0.065,hz);                               // Körper mit Mischer
+  cyl(r, top-rb-(y0+0.13), M.black, SX,(y0+0.13+top-rb)/2,hz);          // senkrechtes Rohr
+  const bend = new THREE.Mesh(new THREE.TorusGeometry(rb, r, 12, 16, Math.PI/2), M.black);
+  bend.rotation.y = Math.PI/2; bend.position.set(SX, top-rb, hz+rb); bend.castShadow = true; CUR.add(bend);
+  const z0 = hz+rb, z1 = hz+reach-0.07;
+  cyl(r, z1-z0, M.black, SX,top,(z0+z1)/2, CUR, flat);                  // waagerechter Auslauf
+  cyl(.0205,.003, M.grip, SX,top,z1+0.0015, CUR, flat);                 // Fuge zur Auszugsbrause
+  cyl(.02,.067, M.black, SX,top,z1+0.0365, CUR, flat);                  // Brausekopf, ausziehbar
+  cyl(.012,.004, mat(0x3a3a3a), SX,top-0.0205,hz+reach-0.025);           // Strahlregler unten
+  bx(SX+0.024,SX+0.034, y0+0.09,y0+0.11, hz-0.008,hz+0.008, M.black, CUR, false);   // Hebel seitlich
+  bx(SX+0.030,SX+0.040, y0+0.10,y0+0.165, hz-0.008,hz+0.008, M.black, CUR, false);
 }
 // Siphon unter dem Becken
 cyl(.022,.08, M.pipe, SX, AP-BW.d-0.04, 0.36);
