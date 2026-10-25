@@ -620,7 +620,8 @@ box(0.004,0.04,0.04, mat(0xd8d8d8), W-0.014, 0.30, L-1.10, CUR, false);
 // Alle stehen ab 76 cm von der Spülwand, mit dem Rücken an der Kaminwand.
 const cabs = [];
 // w: Breite (für das Verschieben), mat + colors: nur Farben, die es den Schrank wirklich gibt
-function cabinet(name, info, w, mat, colors){ const g = group(G.chimney); CUR = g; cabs.push({name, info, w, mat, colors, g}); }
+// z: Startposition von der Spülwand (Standard 76 cm), jeder Schrank merkt sich seine eigene
+function cabinet(name, info, w, mat, colors, z=Z0){ const g = group(G.chimney); CUR = g; cabs.push({name, info, w, mat, colors, g, z}); }
 const buffetDoors = [], buffetDrawers = [];
 const Z0 = 0.76;
 // ---- Bausteine für die Schränke, Front zeigt in den Raum (-x) ----
@@ -814,39 +815,25 @@ buffetDrawers.push(buffetDrawer);
   pane.rotation.y = -Math.PI/2; pane.position.set(fu-0.002, ya, zm); CUR.add(pane);
 }
 
-// ---- Einbau wie die Küche (wie im ersten Entwurf ein Teil der Küchenzeile) ----
-// Unterschrank 36 tief (bündig mit dem Kamin) mit gleicher Arbeitsplatte, darüber Hängeschrank in Oberschrank-Höhe.
-// Fronten + Arbeitsplatte folgen der Farbauswahl der Küche, deshalb keine eigenen Schrankfarben.
-cabinet('Einbau wie die Küche', '120 × 36 cm, Fronten und Arbeitsplatte wie die Küche (Farben unter "Farben")', 1.20, M.front, []);
+// ---- Unterschränke wie die Küche (wie im ersten Entwurf ein Teil der Küchenzeile) ----
+// Nur unten, vom Kamin bis kurz vor die Tisch-Steckdose, 36 tief (bündig mit dem Kamin), gleiche Arbeitsplatte.
+// Drei Türen mit Griffmulde (schwarze U-Schiene), keine Griffe. Folgt den Küchenfarben, deshalb keine eigenen Schrankfarben.
 {
-  const z0 = Z0, z1 = Z0+1.20, zm = Z0+0.60, d = 0.34, fx = W-d, fu = W-D;
+  const len = (L-1.10-0.04) - CH.z1;   // endet an der linken Kante der Steckdose
+  cabinet('Unterschränke wie die Küche', `${Math.round(len*100)} × 36 cm, vom Kamin bis zur Steckdose, drei Türen ohne Griffe, Farben wie die Küche`, len, M.front, [], CH.z1);
+  const z0 = Z0, z1 = Z0+len, dw = len/3, d = 0.34, fx = W-d;
   bx(fx+0.05,W, 0,PL, z0+0.01,z1-0.01, M.plinth);
   shell(z0,z1, PL,BT, d, M.body);
-  divider(zm, PL+0.016,BT-0.016, d, M.body);
+  for (const k of [1,2]) divider(z0+k*dw, PL+0.016,BT-0.016, d, M.body);
+  shelf(z0,z1, 0.48, d, M.inner);
   bx(fx-T-0.01,W, BT,AP, z0,z1, M.top);
-  // links drei Schubladen wie an der Spülwand, Griffmulde oben (schwarze U-Schiene)
-  for (const [y0,y1] of [[0.71,0.877],[0.41,0.71],[0.10,0.41]]){
-    const g = group();
-    const f = gripFront(zm-z0-2*gap, y1-y0-2*gap, M.front, g);
-    f.rotation.y = Math.PI; f.position.set(fx, y0+gap, zm-gap);
-    bx(fx,W-0.03, y0+0.02,y0+0.032, z0+0.03,zm-0.03, M.inner, g);
-    bx(fx,W-0.03, y0+0.032,y1-0.03, z0+0.03,z0+0.042, M.inner, g);
-    bx(fx,W-0.03, y0+0.032,y1-0.03, zm-0.042,zm-0.03, M.inner, g);
-    buffetDrawers.push(g);
-  }
-  // rechts eine Tür, Scharnier zur Fensterseite
-  shelf(zm,z1, 0.48, d, M.inner);
-  {
-    const g = group(); g.position.set(fx, PL, z1);
-    const f = gripFront(z1-zm-2*gap, BT-PL-2*gap, M.front, g);
+  // Türen gehen zur Seite auf, alle mit Scharnier rechts (Fensterseite): links wäre der Kamin im Weg
+  for (let k=1;k<=3;k++){
+    const g = group(); g.position.set(fx, PL, z0 + k*dw);
+    const f = gripFront(dw-2*gap, BT-PL-2*gap, M.front, g);
     f.rotation.y = Math.PI; f.position.set(0, gap, -gap);
     buffetDoors.push({g, dir:-1});
   }
-  // Hängeschrank: zwei Türen, Knöpfe wie am Eckschrank
-  shell(z0,z1, Y0,Y1, D, M.front);
-  shelf(z0,z1, YM, D-0.01, M.inner);
-  hdoor(z0, zm, Y0,Y1, fu, M.front, {hy:Y0+0.13, knob:M.steel});
-  hdoor(z1, zm, Y0,Y1, fu, M.front, {hy:Y0+0.13, knob:M.steel});
 }
 CUR = scene;
 
@@ -952,13 +939,12 @@ document.querySelectorAll('[data-v]').forEach(b => b.onclick = () => setView(b.d
 const $ = id => document.getElementById(id);
 const cm = v => Math.round(v*100);
 let cab = Math.min(cabs.length-1, Math.max(0, Number(q.get('schrank')) || 0));
-let cabZ = Z0;   // Anfang des Schranks, gemessen von der Spülwand
 function placeCab(){
   const c = cabs[cab], max = L - c.w;
-  cabZ = Math.min(Math.max(cabZ, CH.z1), max);
-  cabs.forEach(o => o.g.position.z = cabZ - Z0);
-  $('cabPos').max = cm(max); $('cabPos').value = cm(cabZ);
-  $('cabPosOut').textContent = `${cm(cabZ - CH.z1)} cm Platz zum Kamin, ${cm(L - cabZ - c.w)} cm zur Fensterwand`;
+  c.z = Math.min(Math.max(c.z, CH.z1), max);
+  c.g.position.z = c.z - Z0;
+  $('cabPos').max = cm(max); $('cabPos').value = cm(c.z);
+  $('cabPosOut').textContent = `${cm(c.z - CH.z1)} cm Platz zum Kamin, ${cm(L - c.z - c.w)} cm zur Fensterwand`;
 }
 function showCab(i){
   cab = (i + cabs.length) % cabs.length;
@@ -968,7 +954,7 @@ function showCab(i){
   renderColors();
 }
 $('cabNext').onclick = () => showCab(cab+1);
-$('cabPos').oninput = e => { cabZ = e.target.value/100; placeCab(); };
+$('cabPos').oninput = e => { cabs[cab].z = e.target.value/100; placeCab(); };
 
 // ---------- Farben ----------
 const hex = n => '#' + n.toString(16).padStart(6, '0');
