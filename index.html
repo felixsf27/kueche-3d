@@ -158,8 +158,8 @@ scene.add(fill);
 // Materialien
 const mat = (color, o={}) => new THREE.MeshStandardMaterial({color, roughness:.6, ...o});
 const M = {
-  front: mat(0xd2d2cf, {roughness:.5}),          // Hellgrau
-  body: mat(0xc6c6c3),
+  front: mat(0xbdbdb9, {roughness:.5}),          // Hellgrau
+  body: mat(0xb2b2ae),
   inner: mat(0xf4f2ee),
   top: new THREE.MeshStandardMaterial({roughness:.4}),   // Steinoptik, Textur siehe stoneTexture()
   wall: mat(0xfbfbfa, {roughness:.95}),
@@ -175,7 +175,7 @@ const M = {
   pane: mat(0xbfd9e6, {roughness:.05, transparent:true, opacity:.35}),
   sill: mat(0xe6dccb, {roughness:.5}),
   pipe: mat(0x9a9a9a, {metalness:.5, roughness:.35}),
-  wallK: mat(0xfbfbfa, {roughness:.95}),                  // Wand hinter Herd + Spüle, Farbe wählbar
+  wallK: new THREE.MeshStandardMaterial({roughness:.4}), // Rückwand hinter Herd + Spüle, Steinoptik oder Farbe
   fridge: mat(0xc6c8ca, {metalness:.65, roughness:.32}),
   frame: mat(0xf7f2e8, {roughness:.5}),                   // Fensterrahmen cremeweiß
   marble: mat(0xd8ccb0, {roughness:.35}),
@@ -232,7 +232,9 @@ function gripFront(len, h, m, parent=CUR){
   const t = 0.02, uh = 0.022, w = 0.002;      // Schiene 22 mm hoch, 2 mm Wandstärke
   const g = new THREE.Group(); parent.add(g);
   profileMesh([[0,0],[t,0],[t,h-uh],[0,h-uh]], len, m, g);
-  profileMesh([[0,h-uh],[t,h-uh],[t,h],[t-w,h],[t-w,h-uh+w],[w,h-uh+w],[w,h],[0,h]], len, railMat, g);
+  // J-Profil (nach Felix' Foto): vorne hoher Steg, hinten nur ein kurzer Haken
+  const hb = h-uh+w+0.006;
+  profileMesh([[0,h-uh],[t,h-uh],[t,h],[t-w,h],[t-w,h-uh+w],[w,h-uh+w],[w,hb],[0,hb]], len, railMat, g);
   return g;
 }
 const group = (parent=CUR) => { const g = new THREE.Group(); parent.add(g); return g; };
@@ -280,7 +282,7 @@ function stoneTexture(){
 }
 const STONE = 0x4a4643;   // steht in der Farbauswahl für "Steinoptik mit Rissen"
 const stoneTex = stoneTexture();
-M.top.map = stoneTex;
+M.top.map = M.wallK.map = stoneTex;
 // Boxen bekommen sonst pro Fläche die ganze Textur gestreckt, deshalb UVs aus Weltkoordinaten (1 Kachel = 1,2 m)
 function worldUV(mesh, s=1.2){
   mesh.updateWorldMatrix(true, false);
@@ -431,10 +433,25 @@ bx(0,0.004, AP,Y0, 0,PU.z1, M.wallK, CUR, false);
 // Arbeitsplatte + Kochfeld
 bx(0,0.60, BT,AP, 0,PU.z1, M.top);
 const HZ = (OV.z0+OV.z1)/2;
-bx(0.05,0.57, AP,AP+0.004, HZ-0.29,HZ+0.29, M.glass);
-for (const [x,dz,r] of [[0.18,-0.15,.08],[0.43,-0.15,.06],[0.18,0.15,.06],[0.43,0.15,.09]]){
-  const ring = new THREE.Mesh(new THREE.RingGeometry(r-.006, r, 40), new THREE.MeshBasicMaterial({color:0x777777}));
-  ring.rotation.x = -Math.PI/2; ring.position.set(x, AP+0.005, HZ+dz); CUR.add(ring);
+// Kochfeld nach Foto (Siemens Ceran mit Edelstahlrahmen). u = von links nach rechts (vor dem Herd stehend), v = von hinten nach vorn
+{
+  const GW = 0.57, GD = 0.50, gx0 = 0.045, fr = 0.01;
+  const at = (u, v) => [gx0 + v, HZ + GW/2 - u];             // links = Kühlschrankseite (+z)
+  bx(gx0,gx0+GD, AP,AP+0.004, HZ-GW/2,HZ+GW/2, M.glass);
+  bx(gx0-fr,gx0, AP,AP+0.006, HZ-GW/2-fr,HZ+GW/2+fr, M.steel);           // Rahmen hinten
+  bx(gx0+GD,gx0+GD+fr, AP,AP+0.006, HZ-GW/2-fr,HZ+GW/2+fr, M.steel);     // vorn
+  bx(gx0,gx0+GD, AP,AP+0.006, HZ-GW/2-fr,HZ-GW/2, M.steel);              // rechts
+  bx(gx0,gx0+GD, AP,AP+0.006, HZ+GW/2,HZ+GW/2+fr, M.steel);              // links
+  const lineMat = new THREE.LineBasicMaterial({color:0x8a8a8a});
+  const outline = pts => { const l = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts.map(([u,v]) => { const [x,z] = at(u,v); return new THREE.Vector3(x, AP+0.0045, z); })), lineMat); CUR.add(l); };
+  const circle = (u, v, r) => outline(Array.from({length:64}, (_, i) => [u + r*Math.cos(i/64*Math.PI*2), v + r*Math.sin(i/64*Math.PI*2)]));
+  // Bräterzone links hinten: Kreis mit ovaler Erweiterung nach links
+  circle(0.20, 0.14, 0.085);
+  outline(Array.from({length:64}, (_, i) => { const t = i/64*Math.PI*2, c = Math.cos(t); return [(c < 0 ? 0.12 : 0.20) + 0.105*c, 0.14 + 0.105*Math.sin(t)]; }));
+  circle(0.17, 0.37, 0.095);              // links vorn
+  circle(0.43, 0.12, 0.07);               // rechts hinten, klein
+  circle(0.42, 0.34, 0.095);              // rechts vorn, Zweikreis
+  circle(0.42, 0.34, 0.06);
 }
 // Kühlschrank: normaler Standkühlschrank, 60 breit, 58 tief, niedriger als die Tür
 const FR = {z0:1.36, z1:1.96, d:0.58, h:1.80};   // 60 cm breit
@@ -871,7 +888,7 @@ CUR = scene;
 
 // Wände werfen keine Schatten, sonst laufen schräge Schattenkanten über die Fronten
 wallMeshes.forEach(m => { m.castShadow = false; });
-scene.traverse(o => { if (o.isMesh && o.material === M.top) worldUV(o); });
+scene.traverse(o => { if (o.isMesh && (o.material === M.top || o.material === M.wallK)) worldUV(o); });
 
 // ---------- Steuerung ----------
 const state = {flaps:0, corner:0, spice:0, hood:0, d0:0, d1:0, d2:0, dw:0, sink:0, pull:0, tray:0, led:0, buffet:0, hl:0, table:1};
@@ -958,16 +975,16 @@ $('cabPos').oninput = e => { cabs[cab].z = e.target.value/100; placeCab(); };
 
 // ---------- Farben ----------
 const hex = n => '#' + n.toString(16).padStart(6, '0');
-const FRONTS = [['Hellgrau',0xd2d2cf],['Sand',0xc4baad],['Weiß',0xf2f0ec],['Kaschmir',0xd8cbb8],['Greige',0xa89f94],['Salbei',0xa7b39c],['Dunkelgrün',0x3f5248],
+const FRONTS = [['Hellgrau',0xbdbdb9],['Sand',0xc4baad],['Weiß',0xf2f0ec],['Kaschmir',0xd8cbb8],['Greige',0xa89f94],['Salbei',0xa7b39c],['Dunkelgrün',0x3f5248],
   ['Blaugrau',0x6f7f8c],['Navy',0x2d3a4f],['Terrakotta',0xb5694a],['Anthrazit',0x3d3d3d],['Schwarz',0x1f1f1f]];
 const colorRows = [
-  {label:'Fronten', presets:FRONTS, custom:true, cur:0xd2d2cf,
+  {label:'Fronten', presets:FRONTS, custom:true, cur:0xbdbdb9,
     set:v => { M.front.color.setHex(v); M.body.color.setHex(v).multiplyScalar(0.94); M.dw.color.setHex(v); colorRows[1].cur = v; }},
-  {label:'Spülmaschine', presets:FRONTS, custom:true, cur:0xd2d2cf, set:v => M.dw.color.setHex(v)},
+  {label:'Spülmaschine', presets:FRONTS, custom:true, cur:0xbdbdb9, set:v => M.dw.color.setHex(v)},
   {label:'Arbeitsplatte', custom:true, cur:STONE, set:v => { M.top.map = v === STONE ? stoneTex : null; M.top.color.setHex(v === STONE ? 0xffffff : v); M.top.needsUpdate = true; },
     presets:[['Steinoptik mit Rissen',STONE],['Schwarz',0x1c1c1c],['Beton',0x9a9894],['Weiß',0xeeece8],['Eiche hell',0xc9a06a],['Nussbaum',0x6e4a32]]},
-  {label:'Rückwand Herd + Spüle', custom:true, cur:0xfbfbfa, set:v => M.wallK.color.setHex(v),
-    presets:[['Weiß',0xfbfbfa],['Creme',0xf1e8d8],['Hellgrau',0xd9d9d6],['Salbei',0xc5cdb9],['Hellblau',0xcfdbe3],['Altrosa',0xe3c4bc],['Terrakotta',0xc9825f],['Orange wie bisher',0xe39a4f]]},
+  {label:'Rückwand Herd + Spüle', custom:true, cur:STONE, set:v => { M.wallK.map = v === STONE ? stoneTex : null; M.wallK.color.setHex(v === STONE ? 0xffffff : v); M.wallK.needsUpdate = true; },
+    presets:[['Steinoptik wie Arbeitsplatte',STONE],['Weiß',0xfbfbfa],['Creme',0xf1e8d8],['Hellgrau',0xd9d9d6],['Salbei',0xc5cdb9],['Hellblau',0xcfdbe3],['Altrosa',0xe3c4bc],['Terrakotta',0xc9825f],['Orange wie bisher',0xe39a4f]]},
   {label:'Kühlschrank', cur:0xc6c8ca,
     presets:[['Edelstahl',0xc6c8ca,.65],['Grau',0x8d9094,.3],['Weiß',0xf4f4f2,0],['Schwarz',0x2a2a2a,.3]],
     set:(v, p) => { M.fridge.color.setHex(v); M.fridge.metalness = p ? p[2] : M.fridge.metalness; }},
