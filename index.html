@@ -158,10 +158,10 @@ scene.add(fill);
 // Materialien
 const mat = (color, o={}) => new THREE.MeshStandardMaterial({color, roughness:.6, ...o});
 const M = {
-  front: mat(0xc4baad, {roughness:.5}),
-  body: mat(0xb8aea1),
+  front: mat(0xd2d2cf, {roughness:.5}),          // Hellgrau
+  body: mat(0xc6c6c3),
   inner: mat(0xf4f2ee),
-  top: mat(0x4a4643, {roughness:.55}),
+  top: new THREE.MeshStandardMaterial({roughness:.4}),   // Steinoptik, Textur siehe stoneTexture()
   wall: mat(0xfbfbfa, {roughness:.95}),
   plinth: mat(0x8f877d),
   steel: mat(0xc6c8ca, {metalness:.65, roughness:.32}),
@@ -245,6 +245,53 @@ const CH = {x0:2.27, z1:0.62};   // ehemaliger Kamin: 36 cm breit, 62 cm tief
 const gap = 0.003, T = 0.02;
 const PL = 0.10, BT = 0.88, AP = 0.92;           // Sockel, Korpus oben, Arbeitsplatte oben
 const Y0 = 1.50, Y1 = 2.22, D = 0.35, YM = (Y0+Y1)/2;   // Oberschränke 72 cm
+// Eckschrank oben endet bei CX, damit beide Ecktüren etwa gleich breit sind (26 + 25 cm), danach zwei gleiche Klappenschränke
+const CX = 0.61, XM = (CX + CH.x0)/2;
+
+// Arbeitsplatte: dunkle Steinoptik mit Rissen und wenigen orangen Einschlüssen wie der Boden.
+// Alles wird auch um ±1 Kachelbreite versetzt gemalt, damit die Textur nahtlos kachelt.
+function stoneTexture(){
+  const S = 1024, c = document.createElement('canvas'); c.width = c.height = S;
+  const g = c.getContext('2d');
+  const wrap = draw => { for (const dx of [-S,0,S]) for (const dy of [-S,0,S]) { g.save(); g.translate(dx,dy); draw(); g.restore(); } };
+  g.fillStyle = '#44403d'; g.fillRect(0,0,S,S);
+  for (let i=0;i<40;i++){ const x = Math.random()*S, y = Math.random()*S, r = 40+Math.random()*120, a = Math.random()*3, l = Math.random()<.5;
+    wrap(() => { g.fillStyle = l ? 'rgba(110,104,98,.10)' : 'rgba(25,23,22,.14)'; g.beginPath(); g.ellipse(x,y,r,r*.6,a,0,7); g.fill(); }); }
+  for (let i=0;i<14000;i++){ const v = 45+Math.random()*55|0; g.fillStyle = `rgba(${v},${v-3},${v-6},.55)`; g.fillRect(Math.random()*S, Math.random()*S, 1+Math.random()*2.5, 1+Math.random()*2.5); }
+  function crack(x, y, a, steps, w, col){
+    for (let s=0;s<steps;s++){
+      const x1 = x + Math.cos(a)*7, y1 = y + Math.sin(a)*7;
+      wrap(() => { g.strokeStyle = col; g.lineWidth = w; g.beginPath(); g.moveTo(x,y); g.lineTo(x1,y1); g.stroke(); });
+      x = x1; y = y1; a += (Math.random()-.5)*.35;
+      if (Math.random() < .025 && w > .6) crack(x, y, a + (Math.random() < .5 ? -1 : 1)*(.5+Math.random()*.8), steps*.4|0, w*.6, col);
+    }
+  }
+  g.lineCap = 'round';
+  for (let i=0;i<6;i++) crack(Math.random()*S, Math.random()*S, Math.random()*6.3, 50+Math.random()*70, .8+Math.random()*1.2, 'rgba(150,143,134,.35)');
+  for (let i=0;i<3;i++) crack(Math.random()*S, Math.random()*S, Math.random()*6.3, 40+Math.random()*50, 1.5+Math.random()*1.2, 'rgba(20,18,17,.4)');
+  crack(Math.random()*S, Math.random()*S, Math.random()*6.3, 40, 1, 'rgba(196,128,64,.3)');
+  for (let i=0;i<70;i++){ const x = Math.random()*S, y = Math.random()*S, r = 1+Math.random()*3;   // orange Einschlüsse, bewusst wenige
+    wrap(() => { g.fillStyle = `rgba(${200+Math.random()*30|0},${125+Math.random()*30|0},${60+Math.random()*25|0},${.35+Math.random()*.4})`; g.beginPath(); g.ellipse(x,y,r,r*(.5+Math.random()*.5),Math.random()*3,0,7); g.fill(); }); }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 8;
+  return t;
+}
+const STONE = 0x4a4643;   // steht in der Farbauswahl für "Steinoptik mit Rissen"
+const stoneTex = stoneTexture();
+M.top.map = stoneTex;
+// Boxen bekommen sonst pro Fläche die ganze Textur gestreckt, deshalb UVs aus Weltkoordinaten (1 Kachel = 1,2 m)
+function worldUV(mesh, s=1.2){
+  mesh.updateWorldMatrix(true, false);
+  const p = mesh.geometry.attributes.position, n = mesh.geometry.attributes.normal, uv = mesh.geometry.attributes.uv, v = new THREE.Vector3();
+  for (let i=0;i<p.count;i++){
+    v.fromBufferAttribute(p, i).applyMatrix4(mesh.matrixWorld);
+    const [a, b] = Math.abs(n.getY(i)) > .5 ? [v.x, v.z] : Math.abs(n.getX(i)) > .5 ? [v.z, v.y] : [v.x, v.y];
+    uv.setXY(i, a/s, b/s);
+  }
+  uv.needsUpdate = true;
+}
 
 function tileTexture(){
   const c = document.createElement('canvas'); c.width = c.height = 256;
@@ -531,7 +578,7 @@ function carcass(x0, x1){
 const flapRigs = [];
 const ledMat = new THREE.MeshStandardMaterial({color:0xfff6e0, emissive:0xfff0d0, emissiveIntensity:1});
 const ledLights = [];
-for (const [x0,x1] of [[0.75,1.51],[1.51,CH.x0]]){
+for (const [x0,x1] of [[CX,XM],[XM,CH.x0]]){
   carcass(x0, x1);
   const w = x1-x0-2*gap, hh = (Y1-Y0)/2 - gap;
   const upper = group(); upper.position.set((x0+x1)/2, Y1, D);
@@ -550,15 +597,16 @@ for (const [x0,x1] of [[0.75,1.51],[1.51,CH.x0]]){
 
 // ---------- Eckschrank über Eck: zwei Türen gehen von der Mitte nach außen auf ----------
 CUR = G.corner;
-bx(0,0.75, Y0,Y1, 0,0.33, M.body);
+bx(0,CX, Y0,Y1, 0,0.33, M.body);
 bx(0,0.33, Y0,Y1, 0.33,0.60, M.body);
-bx(0.35,0.73, Y0+T,Y1-T, 0.33,0.332, M.inner, CUR, false);
+bx(0.35,CX-0.02, Y0+T,Y1-T, 0.33,0.332, M.inner, CUR, false);
 bx(0.33,0.332, Y0+T,Y1-T, 0.35,0.58, M.inner, CUR, false);
-bx(0.35,0.73, YM-0.01,YM+0.01, 0.20,0.333, M.inner);
+bx(0.35,CX-0.02, YM-0.01,YM+0.01, 0.20,0.333, M.inner);
 bx(0.20,0.333, YM-0.01,YM+0.01, 0.35,0.58, M.inner);
-const cornerFront = group(); cornerFront.position.set(0.75, Y0, 0.35);
-box(0.40-gap, Y1-Y0-gap, T, M.front, -0.20, (Y1-Y0)/2, -T/2, cornerFront);
-sphere(.014, M.steel, -0.37, (Y1-Y0)*0.18, 0.012, cornerFront);
+const cfW = CX-0.35;   // vordere Tür 26 cm, seitliche 25 cm
+const cornerFront = group(); cornerFront.position.set(CX, Y0, 0.35);
+box(cfW-gap, Y1-Y0-gap, T, M.front, -cfW/2, (Y1-Y0)/2, -T/2, cornerFront);
+sphere(.014, M.steel, -(cfW-0.03), (Y1-Y0)*0.18, 0.012, cornerFront);
 const cornerSide = group(); cornerSide.position.set(0.35, Y0, 0.60);
 box(T, Y1-Y0-gap, 0.25-gap, M.front, -T/2, (Y1-Y0)/2, -0.125, cornerSide);
 sphere(.014, M.steel, 0.012, (Y1-Y0)*0.18, -0.225, cornerSide);
@@ -765,6 +813,41 @@ buffetDrawers.push(buffetDrawer);
   const pane = new THREE.Mesh(new THREE.CircleGeometry(r-0.04, 40, 0, Math.PI), M.pane);
   pane.rotation.y = -Math.PI/2; pane.position.set(fu-0.002, ya, zm); CUR.add(pane);
 }
+
+// ---- Einbau wie die Küche (wie im ersten Entwurf ein Teil der Küchenzeile) ----
+// Unterschrank 36 tief (bündig mit dem Kamin) mit gleicher Arbeitsplatte, darüber Hängeschrank in Oberschrank-Höhe.
+// Fronten + Arbeitsplatte folgen der Farbauswahl der Küche, deshalb keine eigenen Schrankfarben.
+cabinet('Einbau wie die Küche', '120 × 36 cm, Fronten und Arbeitsplatte wie die Küche (Farben unter "Farben")', 1.20, M.front, []);
+{
+  const z0 = Z0, z1 = Z0+1.20, zm = Z0+0.60, d = 0.34, fx = W-d, fu = W-D;
+  bx(fx+0.05,W, 0,PL, z0+0.01,z1-0.01, M.plinth);
+  shell(z0,z1, PL,BT, d, M.body);
+  divider(zm, PL+0.016,BT-0.016, d, M.body);
+  bx(fx-T-0.01,W, BT,AP, z0,z1, M.top);
+  // links drei Schubladen wie an der Spülwand, Griffmulde oben (schwarze U-Schiene)
+  for (const [y0,y1] of [[0.71,0.877],[0.41,0.71],[0.10,0.41]]){
+    const g = group();
+    const f = gripFront(zm-z0-2*gap, y1-y0-2*gap, M.front, g);
+    f.rotation.y = Math.PI; f.position.set(fx, y0+gap, zm-gap);
+    bx(fx,W-0.03, y0+0.02,y0+0.032, z0+0.03,zm-0.03, M.inner, g);
+    bx(fx,W-0.03, y0+0.032,y1-0.03, z0+0.03,z0+0.042, M.inner, g);
+    bx(fx,W-0.03, y0+0.032,y1-0.03, zm-0.042,zm-0.03, M.inner, g);
+    buffetDrawers.push(g);
+  }
+  // rechts eine Tür, Scharnier zur Fensterseite
+  shelf(zm,z1, 0.48, d, M.inner);
+  {
+    const g = group(); g.position.set(fx, PL, z1);
+    const f = gripFront(z1-zm-2*gap, BT-PL-2*gap, M.front, g);
+    f.rotation.y = Math.PI; f.position.set(0, gap, -gap);
+    buffetDoors.push({g, dir:-1});
+  }
+  // Hängeschrank: zwei Türen, Knöpfe wie am Eckschrank
+  shell(z0,z1, Y0,Y1, D, M.front);
+  shelf(z0,z1, YM, D-0.01, M.inner);
+  hdoor(z0, zm, Y0,Y1, fu, M.front, {hy:Y0+0.13, knob:M.steel});
+  hdoor(z1, zm, Y0,Y1, fu, M.front, {hy:Y0+0.13, knob:M.steel});
+}
 CUR = scene;
 
 // ---------- Tisch mit zwei Stühlen unter dem Fenster (wie im Video), ausblendbar ----------
@@ -801,6 +884,7 @@ CUR = scene;
 
 // Wände werfen keine Schatten, sonst laufen schräge Schattenkanten über die Fronten
 wallMeshes.forEach(m => { m.castShadow = false; });
+scene.traverse(o => { if (o.isMesh && o.material === M.top) worldUV(o); });
 
 // ---------- Steuerung ----------
 const state = {flaps:0, corner:0, spice:0, hood:0, d0:0, d1:0, d2:0, dw:0, sink:0, pull:0, tray:0, led:0, buffet:0, hl:0, table:1};
@@ -888,14 +972,14 @@ $('cabPos').oninput = e => { cabZ = e.target.value/100; placeCab(); };
 
 // ---------- Farben ----------
 const hex = n => '#' + n.toString(16).padStart(6, '0');
-const FRONTS = [['Sand',0xc4baad],['Weiß',0xf2f0ec],['Kaschmir',0xd8cbb8],['Greige',0xa89f94],['Salbei',0xa7b39c],['Dunkelgrün',0x3f5248],
+const FRONTS = [['Hellgrau',0xd2d2cf],['Sand',0xc4baad],['Weiß',0xf2f0ec],['Kaschmir',0xd8cbb8],['Greige',0xa89f94],['Salbei',0xa7b39c],['Dunkelgrün',0x3f5248],
   ['Blaugrau',0x6f7f8c],['Navy',0x2d3a4f],['Terrakotta',0xb5694a],['Anthrazit',0x3d3d3d],['Schwarz',0x1f1f1f]];
 const colorRows = [
-  {label:'Fronten', presets:FRONTS, custom:true, cur:0xc4baad,
+  {label:'Fronten', presets:FRONTS, custom:true, cur:0xd2d2cf,
     set:v => { M.front.color.setHex(v); M.body.color.setHex(v).multiplyScalar(0.94); M.dw.color.setHex(v); colorRows[1].cur = v; }},
-  {label:'Spülmaschine', presets:FRONTS, custom:true, cur:0xc4baad, set:v => M.dw.color.setHex(v)},
-  {label:'Arbeitsplatte', custom:true, cur:0x4a4643, set:v => M.top.color.setHex(v),
-    presets:[['Steinoptik dunkel',0x4a4643],['Schwarz',0x1c1c1c],['Beton',0x9a9894],['Weiß',0xeeece8],['Eiche hell',0xc9a06a],['Nussbaum',0x6e4a32]]},
+  {label:'Spülmaschine', presets:FRONTS, custom:true, cur:0xd2d2cf, set:v => M.dw.color.setHex(v)},
+  {label:'Arbeitsplatte', custom:true, cur:STONE, set:v => { M.top.map = v === STONE ? stoneTex : null; M.top.color.setHex(v === STONE ? 0xffffff : v); M.top.needsUpdate = true; },
+    presets:[['Steinoptik mit Rissen',STONE],['Schwarz',0x1c1c1c],['Beton',0x9a9894],['Weiß',0xeeece8],['Eiche hell',0xc9a06a],['Nussbaum',0x6e4a32]]},
   {label:'Rückwand Herd + Spüle', custom:true, cur:0xfbfbfa, set:v => M.wallK.color.setHex(v),
     presets:[['Weiß',0xfbfbfa],['Creme',0xf1e8d8],['Hellgrau',0xd9d9d6],['Salbei',0xc5cdb9],['Hellblau',0xcfdbe3],['Altrosa',0xe3c4bc],['Terrakotta',0xc9825f],['Orange wie bisher',0xe39a4f]]},
   {label:'Kühlschrank', cur:0xc6c8ca,
@@ -907,6 +991,7 @@ const colorRows = [
 function renderColors(){
   $('colors').innerHTML = $('cabColors').innerHTML = '';
   for (const r of colorRows){
+    if (!r.presets.length && !r.custom) continue;
     const row = document.createElement('div'); row.className = 'crow';
     const name = (r.presets.find(p => p[1] === r.cur) || ['eigene Farbe'])[0];
     row.innerHTML = `<b>${r.label}</b> <span>${name}</span><div class="sw"></div>`;
