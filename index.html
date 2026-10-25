@@ -176,7 +176,7 @@ const M = {
   sill: mat(0xe6dccb, {roughness:.5}),
   pipe: mat(0x9a9a9a, {metalness:.5, roughness:.35}),
   wallK: new THREE.MeshStandardMaterial({roughness:.4}), // Rückwand hinter Herd + Spüle, Steinoptik oder Farbe
-  fridge: mat(0xc6c8ca, {metalness:.65, roughness:.32}),
+  fridge: mat(0xf4f4f2, {metalness:0, roughness:.32}),   // Kühlschrank standardmäßig weiß
   frame: mat(0xf7f2e8, {roughness:.5}),                   // Fensterrahmen cremeweiß
   marble: mat(0xd8ccb0, {roughness:.35}),
 };
@@ -987,7 +987,7 @@ const colorRows = [
     presets:[['Steinoptik mit Rissen',STONE],['Schwarz',0x1c1c1c],['Beton',0x9a9894],['Weiß',0xeeece8],['Eiche hell',0xc9a06a],['Nussbaum',0x6e4a32]]},
   {label:'Rückwand Herd + Spüle', custom:true, cur:STONE, set:v => { M.wallK.map = v === STONE ? stoneTex : null; M.wallK.color.setHex(v === STONE ? 0xffffff : v); M.wallK.needsUpdate = true; },
     presets:[['Steinoptik wie Arbeitsplatte',STONE],['Weiß',0xfbfbfa],['Creme',0xf1e8d8],['Hellgrau',0xd9d9d6],['Salbei',0xc5cdb9],['Hellblau',0xcfdbe3],['Altrosa',0xe3c4bc],['Terrakotta',0xc9825f],['Orange wie bisher',0xe39a4f]]},
-  {label:'Kühlschrank', cur:0xc6c8ca,
+  {label:'Kühlschrank', cur:0xf4f4f2,
     presets:[['Edelstahl',0xc6c8ca,.65],['Grau',0x8d9094,.3],['Weiß',0xf4f4f2,0],['Schwarz',0x2a2a2a,.3]],
     set:(v, p) => { M.fridge.color.setHex(v); M.fridge.metalness = p ? p[2] : M.fridge.metalness; }},
   {label:'Farbe', box:'cabColors', get presets(){ return cabs[cab].colors; }, get cur(){ return cabs[cab].mat.color.getHex(); }, set cur(v){},
