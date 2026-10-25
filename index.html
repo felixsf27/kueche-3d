@@ -943,7 +943,8 @@ function updateWalls(){
 }
 
 const q = new URLSearchParams(location.search);
-for (const k of Object.keys(state)) if (q.has(k)) state[k] = target[k] = q.get(k)==='1' ? 1 : 0;
+const FIXED = q.get('modus') === 'ansicht';   // feste Ansicht (Unterseite /ansicht/): nur Kamera, nichts öffnen oder umfärben
+if (!FIXED) for (const k of Object.keys(state)) if (q.has(k)) state[k] = target[k] = q.get(k)==='1' ? 1 : 0;
 setView(q.get('view') || 'a', true);
 if (q.get('cam')) { camera.position.set(...q.get('cam').split(',').map(Number)); controls.target.set(...(q.get('tgt')||'1,0.5,0.5').split(',').map(Number)); }
 apply();
@@ -1018,6 +1019,13 @@ function renderColors(){
   }
 }
 showCab(cab);
+if (FIXED){
+  colorRows[0].set(0x868686);   // Fronten + Spülmaschine RGB 134, so wie Felix es eingestellt hat
+  document.querySelector('.tabs').remove();
+  document.querySelectorAll('[data-sec]').forEach(sec => sec.dataset.sec === 'view' ? sec.classList.add('active') : sec.remove());
+  const h = [...document.querySelectorAll('h2')].find(e => e.textContent === 'Möbel');
+  h.nextElementSibling.remove(); h.remove();
+}
 
 // Handy: Reiter unten, ein Tipp öffnet den Bereich, noch ein Tipp klappt ihn zu
 document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => {
