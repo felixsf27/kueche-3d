@@ -1022,6 +1022,12 @@ showCab(cab);
 if (FIXED){
   colorRows[0].set(0x868686);   // Fronten + Spülmaschine RGB 134, so wie Felix es eingestellt hat
   document.querySelector('.tabs').remove();
+  // Nur die Klappen oben und die Besteckschublade lassen sich hier öffnen (zum Zeigen beim Küchenbauer)
+  const fl = document.querySelector('[data-t="flaps"]'), cu = document.querySelector('[data-t="d0"]');
+  fl.textContent = 'Klappen oben'; cu.textContent = 'Besteckschublade';
+  const oh = document.createElement('h2'); oh.textContent = 'Öffnen';
+  const orow = document.createElement('div'); orow.className = 'row'; orow.append(fl, cu);
+  document.querySelector('[data-sec="view"]').prepend(oh, orow);
   document.querySelectorAll('[data-sec]').forEach(sec => sec.dataset.sec === 'view' ? sec.classList.add('active') : sec.remove());
   const h = [...document.querySelectorAll('h2')].find(e => e.textContent === 'Möbel');
   h.nextElementSibling.remove(); h.remove();
