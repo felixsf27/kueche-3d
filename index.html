@@ -232,9 +232,9 @@ function gripFront(len, h, m, parent=CUR){
   const t = 0.02, uh = 0.022, w = 0.002;      // Schiene 22 mm hoch, 2 mm Wandstärke
   const g = new THREE.Group(); parent.add(g);
   profileMesh([[0,0],[t,0],[t,h-uh],[0,h-uh]], len, m, g);
-  // J-Profil (nach Felix' Foto): vorne hoher Steg, hinten nur ein kurzer Haken
+  // J-Profil (nach Felix' Foto): hinten hoch, schließt mit der Front ab, vorne nur ein kurzer Haken zum Reingreifen
   const hb = h-uh+w+0.006;
-  profileMesh([[0,h-uh],[t,h-uh],[t,h],[t-w,h],[t-w,h-uh+w],[w,h-uh+w],[w,hb],[0,hb]], len, railMat, g);
+  profileMesh([[0,h-uh],[t,h-uh],[t,hb],[t-w,hb],[t-w,h-uh+w],[w,h-uh+w],[w,h],[0,h]], len, railMat, g);
   return g;
 }
 const group = (parent=CUR) => { const g = new THREE.Group(); parent.add(g); return g; };
@@ -852,6 +852,7 @@ buffetDrawers.push(buffetDrawer);
     buffetDoors.push({g, dir:-1});
   }
 }
+cabs.unshift(cabs.pop());   // Unterschränke wie die Küche zuerst zeigen
 CUR = scene;
 
 // ---------- Tisch mit zwei Stühlen unter dem Fenster (wie im Video), ausblendbar ----------
