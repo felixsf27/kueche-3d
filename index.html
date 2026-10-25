@@ -85,6 +85,12 @@
   </div>
   </section>
   <section data-sec="cab">
+  <h2>Eckschrank oben</h2>
+  <div class="row">
+    <button data-eck="diag">Schräge Tür</button>
+    <button data-eck="two">Zwei Türen</button>
+    <button data-eck="fold">Falttür</button>
+  </div>
   <h2>Schrank an der Kaminwand</h2>
   <div class="row">
     <button id="cabNext">Nächster Schrank</button>
@@ -612,23 +618,53 @@ for (const [x0,x1] of [[CX,XM],[XM,CH.x0]]){
   CUR.add(sl, sl.target); ledLights.push(sl);
 }
 
-// ---------- Eckschrank über Eck mit Falttür ----------
-// Beide Fronten hängen an der Ecke zusammen, Scharnier außen am Klappenschrank. Beim Öffnen klappt die
-// seitliche Front auf die vordere und das Paket schwenkt zur Seite, so ist die ganze Ecke auf einmal offen.
+// ---------- Eckschrank oben über Eck: drei Varianten zum Vergleichen (Reiter Schrank) ----------
 CUR = G.corner;
+const cfW = CX-0.35;   // vordere Front 26 cm, seitliche 25 cm
+const corner = {diag: group(), two: group(), fold: group()};
+const lBody = group();   // L-förmiger Korpus für "Zwei Türen" und "Falttür"
+CUR = lBody;
 bx(0,CX, Y0,Y1, 0,0.33, M.body);
 bx(0,0.33, Y0,Y1, 0.33,0.60, M.body);
 bx(0.35,CX-0.02, Y0+T,Y1-T, 0.33,0.332, M.inner, CUR, false);
 bx(0.33,0.332, Y0+T,Y1-T, 0.35,0.58, M.inner, CUR, false);
 bx(0.35,CX-0.02, YM-0.01,YM+0.01, 0.20,0.333, M.inner);
 bx(0.20,0.333, YM-0.01,YM+0.01, 0.35,0.58, M.inner);
-const cfW = CX-0.35;   // vordere Tür 26 cm, seitliche 25 cm
-const cornerFront = group(); cornerFront.position.set(CX, Y0, 0.35);
-box(cfW-gap, Y1-Y0-gap, T, M.front, -cfW/2, (Y1-Y0)/2, -T/2, cornerFront);
-// Griffleiste unten an der Ecke (nicht auf der Front, dort liegt die gefaltete Seitenfront)
-box(0.12, 0.012, T, M.grip, -cfW+0.07, -0.006, -T/2, cornerFront, false);
-const cornerSide = group(cornerFront); cornerSide.position.set(-cfW, 0, 0);
-box(T, Y1-Y0-gap, 0.25-gap, M.front, -T/2, (Y1-Y0)/2, 0.125, cornerSide);
+
+// 1) Zwei Türen gehen in der Ecke von der Mitte nach außen auf
+CUR = corner.two;
+const twoFront = group(); twoFront.position.set(CX, Y0, 0.35);
+box(cfW-gap, Y1-Y0-gap, T, M.front, -cfW/2, (Y1-Y0)/2, -T/2, twoFront);
+sphere(.014, M.steel, -(cfW-0.03), (Y1-Y0)*0.18, 0.012, twoFront);
+const twoSide = group(); twoSide.position.set(0.35, Y0, 0.60);
+box(T, Y1-Y0-gap, 0.25-gap, M.front, -T/2, (Y1-Y0)/2, -0.125, twoSide);
+sphere(.014, M.steel, 0.012, (Y1-Y0)*0.18, -0.225, twoSide);
+
+// 2) Falttür: beide Fronten hängen an der Ecke zusammen, Scharnier außen am Klappenschrank.
+// Die seitliche Front klappt auf die vordere, das Paket schwenkt zur Seite. Griffleiste unten, auf der Front wäre sie eingeklemmt
+CUR = corner.fold;
+const foldFront = group(); foldFront.position.set(CX, Y0, 0.35);
+box(cfW-gap, Y1-Y0-gap, T, M.front, -cfW/2, (Y1-Y0)/2, -T/2, foldFront);
+box(0.12, 0.012, T, M.grip, -cfW+0.07, -0.006, -T/2, foldFront, false);
+const foldSide = group(foldFront); foldSide.position.set(-cfW, 0, 0);
+box(T, Y1-Y0-gap, 0.25-gap, M.front, -T/2, (Y1-Y0)/2, 0.125, foldSide);
+
+// 3) Schräge Tür (Diagonal-Eckhängeschrank): Korpus als Fünfeck, eine Tür schräg über Eck
+CUR = corner.diag;
+const DP = [[0,0],[CX,0],[CX,0.35],[0.35,0.60],[0,0.60]];
+function slab(y, m){   // fünfeckige Platte, Oberkante bei y
+  const sh = new THREE.Shape(); sh.moveTo(...DP[0]); for (const pt of DP.slice(1)) sh.lineTo(...pt); sh.closePath();
+  const g = new THREE.ExtrudeGeometry(sh, {depth:T, bevelEnabled:false});
+  const me = new THREE.Mesh(g, m); me.rotation.x = Math.PI/2; me.position.y = y;
+  me.castShadow = me.receiveShadow = true; me.add(new THREE.LineSegments(new THREE.EdgesGeometry(g), edgeMat)); CUR.add(me);
+}
+slab(Y1, M.body); slab(Y0+T, M.body); slab(YM+0.009, M.inner);
+bx(CX-T,CX, Y0+T,Y1-T, 0,0.35, M.body);                    // Seitenwand zum Klappenschrank
+bx(0,0.35, Y0+T,Y1-T, 0.60-T,0.60, M.body);                // Seitenwand zum Gewürzschrank
+const DIAG = Math.atan2(0.25, CX-0.35), dW = Math.hypot(CX-0.35, 0.25);   // Tür ca. 36 cm breit
+const diagDoor = group(); diagDoor.position.set(CX, Y0, 0.35); diagDoor.rotation.y = DIAG;
+box(dW-gap, Y1-Y0-gap, T, M.front, -dW/2, (Y1-Y0)/2, T/2, diagDoor);
+sphere(.014, M.steel, -(dW-0.03), (Y1-Y0)*0.18, T+0.012, diagDoor);
 
 // ---------- Kaminwand: Holzschrank, max. 36 cm tief, bündig mit dem Kamin ----------
 CUR = G.chimney;
@@ -903,8 +939,11 @@ function apply(){
     r.upper.rotation.x = -state.flaps*90*deg;
     r.lower.rotation.x = state.flaps*90*deg;   // untere Klappe bleibt senkrecht
   }
-  cornerFront.rotation.y = state.corner*95*deg;   // Paket schwenkt zur Seite
-  cornerSide.rotation.y = state.corner*90*deg;    // Seitenfront faltet auf die vordere
+  twoFront.rotation.y = clamp01(state.corner*2)*100*deg;       // erst vorn
+  twoSide.rotation.y = -clamp01(state.corner*2-1)*100*deg;     // dann seitlich
+  foldFront.rotation.y = state.corner*95*deg;                   // Paket schwenkt zur Seite
+  foldSide.rotation.y = state.corner*90*deg;                    // Seitenfront faltet auf die vordere
+  diagDoor.rotation.y = DIAG + state.corner*100*deg;
   spiceDoor.rotation.y = -state.spice*90*deg;
   hood.position.x = state.hood*0.17;
   hobLight.intensity = state.hl*(1.5 + state.hood*3);
@@ -945,6 +984,13 @@ function updateWalls(){
 }
 
 const q = new URLSearchParams(location.search);
+function showCorner(k){
+  for (const v in corner) corner[v].visible = v === k;
+  lBody.visible = k !== 'diag';
+  document.querySelectorAll('[data-eck]').forEach(b => b.classList.toggle('on', b.dataset.eck === k));
+}
+document.querySelectorAll('[data-eck]').forEach(b => b.onclick = () => showCorner(b.dataset.eck));
+showCorner(corner[q.get('eck')] ? q.get('eck') : 'diag');
 for (const k of Object.keys(state)) if (q.has(k)) state[k] = target[k] = q.get(k)==='1' ? 1 : 0;
 setView(q.get('view') || 'a', true);
 if (q.get('cam')) { camera.position.set(...q.get('cam').split(',').map(Number)); controls.target.set(...(q.get('tgt')||'1,0.5,0.5').split(',').map(Number)); }
